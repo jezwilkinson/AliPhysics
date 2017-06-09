@@ -63,29 +63,29 @@ class AliHFSystErr : public TNamed
   }
   void SetIsLowEnergy(Bool_t flag) { 
     fIsLowEnergy = flag; 
-    AliInfo(" Settings for the low energy run");
+    if(flag) AliInfo(" Settings for the low energy run");
   }
   void SetIsLowPtAnalysis(Bool_t flag){
     fIsLowPtAnalysis = flag;
-    AliInfo("Settings for the low pt analysis");  
+    if(flag) AliInfo("Settings for the low pt analysis");  
   }
   void SetIsPass4Analysis(Bool_t flag){
     fIsPass4Analysis = flag;
-    AliInfo("Settings for the pass4 analysis");  
+    if(flag) AliInfo("Settings for the pass4 analysis");  
   }
   void SetIs5TeVAnalysis(Bool_t flag){
    fIs5TeVAnalysis = flag;
-   AliInfo("Settings for the 5TeV analysis");  
+   if(flag) AliInfo("Settings for the 5TeV analysis");  
   }
   void SetIsBDTAnalysis(Bool_t flag){
     fIsBDTAnalysis = flag;
-    AliInfo("Settings for the Lc BDT analysis");  
+    if(flag) AliInfo("Settings for the Lc BDT analysis");  
   }
 
 
   void SetIsPbPb2010EnergyScan(Bool_t flag) {
     fIsCentScan = flag;
-    AliInfo(" Settings for the PbPb 2010 energy scan");
+    if(flag) AliInfo(" Settings for the PbPb 2010 energy scan");
   }
 
   /// Settings of rapidity ranges for pPb 0-100% CC
@@ -95,7 +95,7 @@ class AliHFSystErr : public TNamed
   }
   void SetIspPb2011RapidityScan(Bool_t flag){
     fIsRapidityScan = flag; 
-    AliInfo("Settings for the pPb vs y measurement");
+    if(flag) AliInfo("Settings for the pPb vs y measurement");
   }
 
   /// Function to initialize the variables/histograms
@@ -224,6 +224,7 @@ class AliHFSystErr : public TNamed
   void InitD0toKpi2011PbPb010();
   void InitD0toKpi2013pPb0100();
   void InitD0toKpi2013pPb0100LowPtAn();
+  void InitD0toKpi2016pPb0100LowPtAn();
 
   void InitDplustoKpipi2010pp();
   void InitDplustoKpipi2010ppPass4();

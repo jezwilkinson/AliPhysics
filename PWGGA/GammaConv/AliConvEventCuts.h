@@ -186,6 +186,9 @@ class AliConvEventCuts : public AliAnalysisCuts {
         // 2016
         kLHC16kl,         // pp 13 TeV
         kLHC16q,          // pPb 5 TeV
+	kLHC16r,          // pPb 8 TeV
+	kLHC16s,          // pPb 8 TeV
+	kLHC16t,          // pPb 5 TeV
         // MC's corresponding to 2016 data
         kLHC16j2a1,       // anchored LHC16k pass 1 - general purpose Pythia8
         kLHC16j2b1,       // anchored LHC16k pass 1 - general purpose EPOSLHC
@@ -515,8 +518,9 @@ class AliConvEventCuts : public AliAnalysisCuts {
       TString*                    fGeneratorNames;                        //[fnHeaders]
       PeriodVar                   fPeriodEnum;                            // period selector
       EnergyVar                   fEnergyEnum;                            // energy selector
-      
+
       TObjString*                 fCutString;                             // cut number used for analysis
+      TString                     fCutStringRead;
       AliAnalysisUtils*           fUtils;
       Double_t                    fEtaShift;
       Bool_t                      fDoEtaShift;                            // Flag for Etashift
@@ -590,7 +594,7 @@ class AliConvEventCuts : public AliAnalysisCuts {
       Int_t                       fDebugLevel;                            // debug level for interactive debugging
   private:
 
-      ClassDef(AliConvEventCuts,31)
+      ClassDef(AliConvEventCuts,32)
 };
 
 
