@@ -89,14 +89,13 @@ AliAnalysisTaskEmcalDijetImbalance::AliAnalysisTaskEmcalDijetImbalance() :
   fkEMCEJE(kFALSE),
   fPlotNeutralJets(kFALSE),
   fPlotClustersInJets(kFALSE),
+  fPlotClusterTHnSparse(kTRUE),
+  fPlotClusWithoutNonLinCorr(kFALSE),
   fPHOSGeo(nullptr)
 {
   GenerateHistoBins();
   Dijet_t fDijet;
   Dijet_t fMatchingDijet;
-  
-  // Configure base class to set fTriggerPatchInfo to array of trigger patches, each event
-  this->SetCaloTriggerPatchInfoName("EmcalTriggers");
 }
 
 /**
@@ -143,14 +142,13 @@ AliAnalysisTaskEmcalDijetImbalance::AliAnalysisTaskEmcalDijetImbalance(const cha
   fkEMCEJE(kFALSE),
   fPlotNeutralJets(kFALSE),
   fPlotClustersInJets(kFALSE),
+  fPlotClusterTHnSparse(kTRUE),
+  fPlotClusWithoutNonLinCorr(kFALSE),
   fPHOSGeo(nullptr)
 {
   GenerateHistoBins();
   Dijet_t fDijet;
   Dijet_t fMatchingDijet;
-  
-  // Configure base class to set fTriggerPatchInfo to array of trigger patches, each event
-  this->SetCaloTriggerPatchInfoName("EmcalTriggers");
 }
 
 /**
@@ -771,83 +769,85 @@ void AliAnalysisTaskEmcalDijetImbalance::AllocateCaloHistograms()
     }
   
     // Plot cluster THnSparse (centrality, cluster type, E, E-hadcorr, has matched track, M02, Ncells)
-    Int_t dim = 0;
-    TString title[20];
-    Int_t nbins[20] = {0};
-    Double_t min[30] = {0.};
-    Double_t max[30] = {0.};
-    Double_t *binEdges[20] = {0};
-    
-    if (fForceBeamType != AliAnalysisTaskEmcal::kpp) {
-      title[dim] = "Centrality %";
-      nbins[dim] = fNCentHistBins;
-      binEdges[dim] = fCentHistBins;
-      min[dim] = fCentHistBins[0];
-      max[dim] = fCentHistBins[fNCentHistBins];
+    if (fPlotClusterTHnSparse) {
+      Int_t dim = 0;
+      TString title[20];
+      Int_t nbins[20] = {0};
+      Double_t min[30] = {0.};
+      Double_t max[30] = {0.};
+      Double_t *binEdges[20] = {0};
+      
+      if (fForceBeamType != AliAnalysisTaskEmcal::kpp) {
+        title[dim] = "Centrality %";
+        nbins[dim] = fNCentHistBins;
+        binEdges[dim] = fCentHistBins;
+        min[dim] = fCentHistBins[0];
+        max[dim] = fCentHistBins[fNCentHistBins];
+        dim++;
+      }
+      
+      title[dim] = "#eta";
+      nbins[dim] = 28;
+      min[dim] = -0.7;
+      max[dim] = 0.7;
+      binEdges[dim] = GenerateFixedBinArray(nbins[dim], min[dim], max[dim]);
       dim++;
-    }
-    
-    title[dim] = "#eta";
-    nbins[dim] = 28;
-    min[dim] = -0.7;
-    max[dim] = 0.7;
-    binEdges[dim] = GenerateFixedBinArray(nbins[dim], min[dim], max[dim]);
-    dim++;
-    
-    title[dim] = "#phi";
-    nbins[dim] = 100;
-    min[dim] = 1.;
-    max[dim] = 6.;
-    binEdges[dim] = GenerateFixedBinArray(nbins[dim], min[dim], max[dim]);
-    dim++;
-    
-    title[dim] = "#it{E}_{clus} (GeV)";
-    nbins[dim] = fNPtHistBins;
-    binEdges[dim] = fPtHistBins;
-    min[dim] = fPtHistBins[0];
-    max[dim] = fPtHistBins[fNPtHistBins];
-    dim++;
-    
-    title[dim] = "#it{E}_{clus, hadcorr} or #it{E}_{core} (GeV)";
-    nbins[dim] = fNPtHistBins;
-    binEdges[dim] = fPtHistBins;
-    min[dim] = fPtHistBins[0];
-    max[dim] = fPtHistBins[fNPtHistBins];
-    dim++;
-    
-    title[dim] = "Matched track";
-    nbins[dim] = 2;
-    min[dim] = -0.5;
-    max[dim] = 1.5;
-    binEdges[dim] = GenerateFixedBinArray(nbins[dim], min[dim], max[dim]);
-    dim++;
-    
-    title[dim] = "M02";
-    nbins[dim] = 100;
-    min[dim] = 0;
-    max[dim] = 10;
-    binEdges[dim] = GenerateFixedBinArray(nbins[dim], min[dim], max[dim]);
-    dim++;
-    
-    title[dim] = "Ncells";
-    nbins[dim] = 40;
-    min[dim] = -0.5;
-    max[dim] = 49.5;
-    binEdges[dim] = GenerateFixedBinArray(nbins[dim], min[dim], max[dim]);
-    dim++;
-    
-    title[dim] = "Dispersion cut";
-    nbins[dim] = 2;
-    min[dim] = -0.5;
-    max[dim] = 1.5;
-    binEdges[dim] = GenerateFixedBinArray(nbins[dim], min[dim], max[dim]);
-    dim++;
-    
-    TString thnname = TString::Format("%s/clusterObservables", cont->GetArrayName().Data());
-    THnSparse* hn = fHistManager.CreateTHnSparse(thnname.Data(), thnname.Data(), dim, nbins, min, max);
-    for (Int_t i = 0; i < dim; i++) {
-      hn->GetAxis(i)->SetTitle(title[i]);
-      hn->SetBinEdges(i, binEdges[i]);
+      
+      title[dim] = "#phi";
+      nbins[dim] = 100;
+      min[dim] = 1.;
+      max[dim] = 6.;
+      binEdges[dim] = GenerateFixedBinArray(nbins[dim], min[dim], max[dim]);
+      dim++;
+      
+      title[dim] = "#it{E}_{clus} (GeV)";
+      nbins[dim] = fNPtHistBins;
+      binEdges[dim] = fPtHistBins;
+      min[dim] = fPtHistBins[0];
+      max[dim] = fPtHistBins[fNPtHistBins];
+      dim++;
+      
+      title[dim] = "#it{E}_{clus, hadcorr} or #it{E}_{core} (GeV)";
+      nbins[dim] = fNPtHistBins;
+      binEdges[dim] = fPtHistBins;
+      min[dim] = fPtHistBins[0];
+      max[dim] = fPtHistBins[fNPtHistBins];
+      dim++;
+      
+      title[dim] = "Matched track";
+      nbins[dim] = 2;
+      min[dim] = -0.5;
+      max[dim] = 1.5;
+      binEdges[dim] = GenerateFixedBinArray(nbins[dim], min[dim], max[dim]);
+      dim++;
+      
+      title[dim] = "M02";
+      nbins[dim] = 100;
+      min[dim] = 0;
+      max[dim] = 10;
+      binEdges[dim] = GenerateFixedBinArray(nbins[dim], min[dim], max[dim]);
+      dim++;
+      
+      title[dim] = "Ncells";
+      nbins[dim] = 40;
+      min[dim] = -0.5;
+      max[dim] = 49.5;
+      binEdges[dim] = GenerateFixedBinArray(nbins[dim], min[dim], max[dim]);
+      dim++;
+      
+      title[dim] = "Dispersion cut";
+      nbins[dim] = 2;
+      min[dim] = -0.5;
+      max[dim] = 1.5;
+      binEdges[dim] = GenerateFixedBinArray(nbins[dim], min[dim], max[dim]);
+      dim++;
+      
+      TString thnname = TString::Format("%s/clusterObservables", cont->GetArrayName().Data());
+      THnSparse* hn = fHistManager.CreateTHnSparse(thnname.Data(), thnname.Data(), dim, nbins, min, max);
+      for (Int_t i = 0; i < dim; i++) {
+        hn->GetAxis(i)->SetTitle(title[i]);
+        hn->SetBinEdges(i, binEdges[i]);
+      }
     }
   }
 
@@ -969,6 +969,11 @@ void AliAnalysisTaskEmcalDijetImbalance::AllocateCaloHistograms()
         hn->GetAxis(i)->SetTitle(title[i]);
         hn->SetBinEdges(i, binEdges[i]);
       }
+      
+      // (jet type, jet pT, cluster shift)
+      histname = TString::Format("%s/hCaloJESshift", jets->GetArrayName().Data());
+      htitle = histname + ";type;#it{p}_{T}^{corr} (GeV/#it{c});#Delta_{JES}";
+      fHistManager.CreateTH3(histname.Data(), htitle.Data(), 3, -0.5, 2.5, nPtBins, 0, fMaxPt, 100, 0, 20);
     }
 
   }
@@ -1156,24 +1161,15 @@ void AliAnalysisTaskEmcalDijetImbalance::LoadBackgroundScalingHistogram(const ch
 void AliAnalysisTaskEmcalDijetImbalance::ExecOnce()
 {
   
+  // Configure base class to set fTriggerPatchInfo to array of trigger patches, each event
+  // (Need to call this before base class ExecOnce)
+  if (fDoTriggerSimulation) {
+    this->SetCaloTriggerPatchInfoName("EmcalTriggers");
+  }
+  
   AliAnalysisTaskEmcalJet::ExecOnce();
 
   fNeedEmcalGeom = kTRUE;
-  
-  // Check if trigger patches are loaded
-  if (fTriggerPatchInfo) {
-    TString objname(fTriggerPatchInfo->GetClass()->GetName());
-    TClass cls(objname);
-    if (!cls.InheritsFrom("AliEMCALTriggerPatchInfo")) {
-      AliError(Form("%s: Objects of type %s in %s are not inherited from AliEMCALTriggerPatchInfo!",
-                    GetName(), cls.GetName(), "EmcalTriggers"));
-      fTriggerPatchInfo = 0;
-    }
-  }
-  if (!fTriggerPatchInfo) {
-    AliError(Form("%s: Unable to get trigger patch container with name %s. Aborting", GetName(), "EmcalTriggers"));
-    return;
-  }
 
   // Load the PHOS geometry
   if (fDoCaloStudy) {
@@ -1185,9 +1181,9 @@ void AliAnalysisTaskEmcalDijetImbalance::ExecOnce()
       AliInfo("Creating PHOS geometry!");
       Int_t runNum = InputEvent()->GetRunNumber();
       if(runNum<209122) //Run1
-      fPHOSGeo =  AliPHOSGeometry::GetInstance("IHEP");
+        fPHOSGeo =  AliPHOSGeometry::GetInstance("IHEP");
       else
-      fPHOSGeo =  AliPHOSGeometry::GetInstance("Run2");
+        fPHOSGeo =  AliPHOSGeometry::GetInstance("Run2");
       
       if (fPHOSGeo) {
         AliOADBContainer geomContainer("phosGeo");
@@ -1200,6 +1196,23 @@ void AliAnalysisTaskEmcalDijetImbalance::ExecOnce()
           ((TGeoHMatrix*)matrixes->At(mod))->Print();
         }
       }
+    }
+  }
+  
+  // Check if trigger patches are loaded
+  if (fDoTriggerSimulation) {
+    if (fTriggerPatchInfo) {
+      TString objname(fTriggerPatchInfo->GetClass()->GetName());
+      TClass cls(objname);
+      if (!cls.InheritsFrom("AliEMCALTriggerPatchInfo")) {
+        AliError(Form("%s: Objects of type %s in %s are not inherited from AliEMCALTriggerPatchInfo!",
+                      GetName(), cls.GetName(), "EmcalTriggers"));
+        fTriggerPatchInfo = 0;
+      }
+    }
+    if (!fTriggerPatchInfo) {
+      AliError(Form("%s: Unable to get trigger patch container with name %s. Aborting", GetName(), "EmcalTriggers"));
+      return;
     }
   }
   
@@ -2340,6 +2353,9 @@ void AliAnalysisTaskEmcalDijetImbalance::FillCaloHistograms()
         
         Ehadcorr = it->second->GetHadCorrEnergy();
         Enonlin = it->second->GetNonLinCorrEnergy();
+        if (fPlotClusWithoutNonLinCorr) {
+          Enonlin = it->second->E();
+        }
         
         Int_t sm = fGeom->GetSuperModuleNumber(it->second->GetCellAbsId(0));
         if (sm >=0 && sm < 20) {
@@ -2414,35 +2430,37 @@ void AliAnalysisTaskEmcalDijetImbalance::FillCaloHistograms()
         passedDispersionCut = 1;
       }
       
-      Double_t contents[30]={0};
-      histname = TString::Format("%s/clusterObservables", clusters->GetArrayName().Data());
-      THnSparse* histClusterObservables = static_cast<THnSparse*>(fHistManager.FindObject(histname));
-      if (!histClusterObservables) return;
-      for (Int_t i = 0; i < histClusterObservables->GetNdimensions(); i++) {
-        TString title(histClusterObservables->GetAxis(i)->GetTitle());
-        if (title=="Centrality %")
-          contents[i] = fCent;
-        else if (title=="#eta")
-          contents[i] = it->first.Eta();
-        else if (title=="#phi")
-          contents[i] = it->first.Phi_0_2pi();
-        else if (title=="#it{E}_{clus} (GeV)")
-          contents[i] = Enonlin;
-        else if (title=="#it{E}_{clus, hadcorr} or #it{E}_{core} (GeV)")
-          contents[i] = Ehadcorr;
-        else if (title=="Matched track")
-          contents[i] = hasMatchedTrack;
-        else if (title=="M02")
-          contents[i] = it->second->GetM02();
-        else if (title=="Ncells")
-          contents[i] = it->second->GetNCells();
-        else if (title=="Dispersion cut")
-          contents[i] = passedDispersionCut;
-        else
-          AliWarning(Form("Unable to fill dimension %s!",title.Data()));
+      if (fPlotClusterTHnSparse) {
+        Double_t contents[30]={0};
+        histname = TString::Format("%s/clusterObservables", clusters->GetArrayName().Data());
+        THnSparse* histClusterObservables = static_cast<THnSparse*>(fHistManager.FindObject(histname));
+        if (!histClusterObservables) return;
+        for (Int_t i = 0; i < histClusterObservables->GetNdimensions(); i++) {
+          TString title(histClusterObservables->GetAxis(i)->GetTitle());
+          if (title=="Centrality %")
+            contents[i] = fCent;
+          else if (title=="#eta")
+            contents[i] = it->first.Eta();
+          else if (title=="#phi")
+            contents[i] = it->first.Phi_0_2pi();
+          else if (title=="#it{E}_{clus} (GeV)")
+            contents[i] = Enonlin;
+          else if (title=="#it{E}_{clus, hadcorr} or #it{E}_{core} (GeV)")
+            contents[i] = Ehadcorr;
+          else if (title=="Matched track")
+            contents[i] = hasMatchedTrack;
+          else if (title=="M02")
+            contents[i] = it->second->GetM02();
+          else if (title=="Ncells")
+            contents[i] = it->second->GetNCells();
+          else if (title=="Dispersion cut")
+            contents[i] = passedDispersionCut;
+          else
+            AliWarning(Form("Unable to fill dimension %s!",title.Data()));
+        }
+        histClusterObservables->Fill(contents);
       }
-      histClusterObservables->Fill(contents);
-        
+      
     }
 
   }
@@ -2489,6 +2507,26 @@ void AliAnalysisTaskEmcalDijetImbalance::FillCaloHistograms()
           clus = jet->Cluster(iClus);
           Double_t x[5] = {fCent, clus->E(), GetJetPt(jets, jet), jet->Eta(), jet->Phi_0_2pi()};
           fHistManager.FillTHnSparse(histname, x);
+        }
+        
+        // Loop through clusters, and plot estimated shift in JES due to cluster bump
+        // Only do for 0-10% centrality, and for EMCal/DCal
+        Double_t eclus;
+        Double_t shift;
+        Double_t shiftSum = 0;
+        if (fCent < 10.) {
+          if (GetJetType(jet) > -0.5 && GetJetType(jet) < 1.5) {
+            for (Int_t iClus = 0; iClus < nClusters; iClus++) {
+              clus = jet->Cluster(iClus);
+              eclus = clus->E();
+              if (eclus > 0.5) {
+                shift = 0.79 * TMath::Exp(-0.5 * ((eclus - 3.81) / 1.50)*((eclus - 3.81) / 1.50) );
+                shiftSum += shift;
+              }
+            }
+            histname = TString::Format("%s/hCaloJESshift", jets->GetArrayName().Data());
+            fHistManager.FillTH3(histname, GetJetType(jet), GetJetPt(jets, jet), shiftSum);
+          }
         }
       }
       
