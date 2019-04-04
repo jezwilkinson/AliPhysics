@@ -44,12 +44,12 @@ public:
 private:
   AliAnalysisTaskSEImproveITS(const AliAnalysisTaskSEImproveITS&);
   AliAnalysisTaskSEImproveITS& operator=(const AliAnalysisTaskSEImproveITS&); 
-
   /// Helper functions
   Double_t EvalGraph(Double_t x,const TGraph *graph,const TGraph *graphSA=0) const; 
   void SmearTrack(AliVTrack *track, Double_t bz);
   AliESDVertex* RecalculateVertex(const AliVVertex *old,TObjArray *tracks,Double_t bField);
   Int_t PhiBin(Double_t phi) const;
+  void OpenImproverHistos();
 
   TGraph *fD0ZResPCur  ; /// old pt dep. d0 res. in z for protons
   TGraph *fD0ZResKCur  ; /// old pt dep. d0 res. in z for kaons
@@ -124,9 +124,10 @@ private:
   TNtuple *fDebugNtuple; //!<! debug send on output slot 1
   Float_t *fDebugVars;   //!<! variables to store as degug info 
   Int_t   fNDebug;       /// Max number of debug entries into Ntuple
-
+  TString fImproverSuffix; /// suffix for path of correction file on grid 
+  Bool_t fFilesOpen; 	 /// check to ensure improver files from CVMFS are accessed only once
   /// \cond CLASSIMP
-  ClassDef(AliAnalysisTaskSEImproveITS,10);
+  ClassDef(AliAnalysisTaskSEImproveITS,11);
   /// \endcond
 };
 

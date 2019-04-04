@@ -1,7 +1,7 @@
 AliAnalysisTaskSEImproveITS *AddTaskImproveITS(Bool_t isRunInVertexing=kFALSE, // set to kTRUE to run during AODvertexingHF creation
 					       const char *period="LHC15o",
                            const char *systematic="central",
-					       Int_t ndebug=0) {
+					       Int_t ndebug=0, Bool_t overrideDefault = kFALSE) {
   AliAnalysisManager *mgr = AliAnalysisManager::GetAnalysisManager();
   if (!mgr) {
     ::Error("AddAliAnalysisTaskSEImproveITS", "No analysis manager to connect to.");

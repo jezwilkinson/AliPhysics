@@ -22,6 +22,7 @@
 
 #include "AliVertex.h"
 #include "AliVVertex.h"
+#include "AliVEventHandler.h"
 #include "AliESDVertex.h"
 #include "AliESDEvent.h"
 #include "AliVertexerTracks.h"
@@ -36,6 +37,8 @@
 #include "AliAnalysisVertexingHF.h"
 #include "AliNeutralTrackParam.h"
 #include "AliAnalysisTaskSEImproveITS.h"
+#include "AliDataFile.h"
+#include "AliAnalysisManager.h"
 
 //
 // Implementation of the "hybrid-approach" for ITS upgrade studies.
@@ -112,7 +115,9 @@ AliAnalysisTaskSEImproveITS::AliAnalysisTaskSEImproveITS()
    fDebugOutput (0),
    fDebugNtuple (0),
    fDebugVars   (0), 
-   fNDebug      (0)
+   fNDebug      (0),
+   fImproverSuffix(0),
+   fFilesOpen(kFALSE)
 {
   //
   // Default constructor.
@@ -200,7 +205,9 @@ AliAnalysisTaskSEImproveITS::AliAnalysisTaskSEImproveITS(const char *name,
    fDebugOutput (0),
    fDebugNtuple (0),
    fDebugVars   (0),
-   fNDebug      (ndebug)
+   fNDebug      (ndebug),
+   fImproverSuffix(0),
+   fFilesOpen(kFALSE)
 {
   //
   // Constructor to be used to create the task.
@@ -223,205 +230,6 @@ AliAnalysisTaskSEImproveITS::AliAnalysisTaskSEImproveITS(const char *name,
     }
   }
   
-  TString resfileCurURI = Form("alien:///alice/cern.ch/user/p/pwg_hf/common/Improver/%s/%s/ITSgraphs_Current.root",period,systematic);
-  TFile *resfileCur=TFile::Open(resfileCurURI.Data());
-  if(resfileCur) {    
-    if(resfileCur->Get("D0RPResP" )) {
-      fD0RPResPCur =(TGraph*)(resfileCur->Get("D0RPResP" )->Clone("D0RPResPCur" ));
-    }
-    if(resfileCur->Get("D0RPResK" )) {
-      fD0RPResKCur =(TGraph*)(resfileCur->Get("D0RPResK" )->Clone("D0RPResKCur" ));
-    }
-    if(resfileCur->Get("D0RPResPi")) {
-      fD0RPResPiCur=(TGraph*)(resfileCur->Get("D0RPResPi")->Clone("D0RPResPiCur"));
-    }
-    if(resfileCur->Get("D0RPResE")) {
-      fD0RPResECur=(TGraph*)(resfileCur->Get("D0RPResE")->Clone("D0RPResECur"));
-    }
-    if(resfileCur->Get("D0RPSigmaPullRatioP" )) {
-      fD0RPSigmaPullRatioP =(TGraph*)(resfileCur->Get("D0RPSigmaPullRatioP" ));
-    }
-    if(resfileCur->Get("D0RPSigmaPullRatioK" )) {
-      fD0RPSigmaPullRatioK =(TGraph*)(resfileCur->Get("D0RPSigmaPullRatioK" ));
-    }
-    if(resfileCur->Get("D0RPSigmaPullRatioPi")) {
-      fD0RPSigmaPullRatioPi=(TGraph*)(resfileCur->Get("D0RPSigmaPullRatioPi"));
-    }
-    if(resfileCur->Get("D0RPSigmaPullRatioE")) {
-      fD0RPSigmaPullRatioE=(TGraph*)(resfileCur->Get("D0RPSigmaPullRatioE"));
-    }
-    for(Int_t j=0; j<2; j++){
-      for(Int_t i=0; i<4; i++){
-	if(resfileCur->Get(Form("D0RPMeanP_B%d_phi%d",j,i))) {
-	  fD0RPMeanPCur[j][i]=(TGraph*)(resfileCur->Get(Form("D0RPMeanP_B%d_phi%d",j,i))->Clone(Form("D0RPMeanPCur_B%d_phi%d",j,i)));
-	}
-	if(resfileCur->Get(Form("D0RPMeanK_B%d_phi%d",j,i))) {
-	  fD0RPMeanKCur[j][i]=(TGraph*)(resfileCur->Get(Form("D0RPMeanK_B%d_phi%d",j,i))->Clone(Form("D0RPMeanKCur_B%d_phi%d",j,i)));
-	}
-	if(resfileCur->Get(Form("D0RPMeanPi_B%d_phi%d",j,i))) {
-	  fD0RPMeanPiCur[j][i]=(TGraph*)(resfileCur->Get(Form("D0RPMeanPi_B%d_phi%d",j,i))->Clone(Form("D0RPMeanPiCur_B%d_phi%d",j,i)));
-	}
-	if(resfileCur->Get(Form("D0RPMeanE_B%d_phi%d",j,i))) {
-	  fD0RPMeanECur[j][i]=(TGraph*)(resfileCur->Get(Form("D0RPMeanE_B%d_phi%d",j,i))->Clone(Form("D0RPMeanECur_B%d_phi%d",j,i)));
-	}
-      }
-    }
-    if(resfileCur->Get("D0ZResP"  )) {
-      fD0ZResPCur  =(TGraph*)(resfileCur->Get("D0ZResP"  )->Clone("D0ZResPCur"  ));
-    }
-    if(resfileCur->Get("D0ZResK"  )) {
-      fD0ZResKCur  =(TGraph*)(resfileCur->Get("D0ZResK"  )->Clone("D0ZResKCur"  ));
-    }
-    if(resfileCur->Get("D0ZResPi" )) {
-      fD0ZResPiCur =(TGraph*)(resfileCur->Get("D0ZResPi" )->Clone("D0ZResPiCur" ));
-    }
-    if(resfileCur->Get("D0ZResE" )) {
-      fD0ZResECur =(TGraph*)(resfileCur->Get("D0ZResE" )->Clone("D0ZResECur" ));
-    }
-    if(resfileCur->Get("Pt1ResP"  )) {
-      fPt1ResPCur  =(TGraph*)(resfileCur->Get("Pt1ResP"  )->Clone("Pt1ResPCur"  ));
-    }
-    if(resfileCur->Get("Pt1ResK"  )) {
-      fPt1ResKCur  =(TGraph*)(resfileCur->Get("Pt1ResK"  )->Clone("Pt1ResKCur"  ));
-    }
-    if(resfileCur->Get("Pt1ResPi" )) {
-      fPt1ResPiCur =(TGraph*)(resfileCur->Get("Pt1ResPi" )->Clone("Pt1ResPiCur" ));
-    }
-    if(resfileCur->Get("Pt1ResE" )) {
-      fPt1ResECur =(TGraph*)(resfileCur->Get("Pt1ResE" )->Clone("Pt1ResECur" ));
-    }
-    if(resfileCur->Get("D0RPResPSA" )) {
-      fD0RPResPCurSA =(TGraph*)(resfileCur->Get("D0RPResPSA" )->Clone("D0RPResPCurSA" ));
-    }
-    if(resfileCur->Get("D0RPResKSA" )) {
-      fD0RPResKCurSA =(TGraph*)(resfileCur->Get("D0RPResKSA" )->Clone("D0RPResKCurSA" ));
-    }
-    if(resfileCur->Get("D0RPResPiSA")) {
-      fD0RPResPiCurSA=(TGraph*)(resfileCur->Get("D0RPResPiSA")->Clone("D0RPResPiCurSA"));
-    }
-    if(resfileCur->Get("D0RPResESA")) {
-      fD0RPResECurSA=(TGraph*)(resfileCur->Get("D0RPResESA")->Clone("D0RPResECurSA"));
-    }
-    if(resfileCur->Get("D0ZResPSA"  )) {
-      fD0ZResPCurSA  =(TGraph*)(resfileCur->Get("D0ZResPSA"  )->Clone("D0ZResPCurSA"  ));
-    }
-    if(resfileCur->Get("D0ZResKSA"  )) {
-      fD0ZResKCurSA  =(TGraph*)(resfileCur->Get("D0ZResKSA"  )->Clone("D0ZResKCurSA"  ));
-    }
-    if(resfileCur->Get("D0ZResPiSA" )) {
-      fD0ZResPiCurSA =(TGraph*)(resfileCur->Get("D0ZResPiSA" )->Clone("D0ZResPiCurSA" ));
-    }
-    if(resfileCur->Get("D0ZResESA" )) {
-      fD0ZResECurSA =(TGraph*)(resfileCur->Get("D0ZResESA" )->Clone("D0ZResECurSA" ));
-    }
-    if(resfileCur->Get("Pt1ResPSA"  )) {
-      fPt1ResPCurSA  =(TGraph*)(resfileCur->Get("Pt1ResPSA"  )->Clone("Pt1ResPCurSA"  ));
-    }
-    if(resfileCur->Get("Pt1ResKSA"  )) {
-      fPt1ResKCurSA  =(TGraph*)(resfileCur->Get("Pt1ResKSA"  )->Clone("Pt1ResKCurSA"  ));
-    }
-    if(resfileCur->Get("Pt1ResPiSA" )) {
-      fPt1ResPiCurSA =(TGraph*)(resfileCur->Get("Pt1ResPiSA" )->Clone("Pt1ResPiCurSA" ));
-    }
-    if(resfileCur->Get("Pt1ResESA" )) {
-      fPt1ResECurSA =(TGraph*)(resfileCur->Get("Pt1ResESA" )->Clone("Pt1ResECurSA" ));
-    }
-    delete resfileCur;
-  }
-    
-  TString resfileUpgURI = Form("alien:///alice/cern.ch/user/p/pwg_hf/common/Improver/%s/%s/ITSgraphs_NewAll-X0.3-Res4um.root",period,systematic);
-  TFile *resfileUpg=TFile::Open(resfileUpgURI.Data());
-  if(resfileUpg) {
-    if(resfileUpg->Get("D0RPResP" )) {
-      fD0RPResPUpg =(TGraph*)(resfileUpg->Get("D0RPResP" )->Clone("D0RPResPUpg" ));
-    }
-    if(resfileUpg->Get("D0RPResK" )) {
-      fD0RPResKUpg =(TGraph*)(resfileUpg->Get("D0RPResK" )->Clone("D0RPResKUpg" ));
-    }
-    if(resfileUpg->Get("D0RPResPi")) {
-      fD0RPResPiUpg=(TGraph*)(resfileUpg->Get("D0RPResPi")->Clone("D0RPResPiUpg"));
-    }
-    if(resfileUpg->Get("D0RPResE")) {
-      fD0RPResEUpg=(TGraph*)(resfileUpg->Get("D0RPResE")->Clone("D0RPResEUpg"));
-    }
-    for(Int_t j=0; j<2; j++){
-      for(Int_t i=0; i<4; i++){
-	if(resfileUpg->Get(Form("D0RPMeanP_B%d_phi%d",j,i))) {
-	  fD0RPMeanPUpg[j][i]=(TGraph*)(resfileUpg->Get(Form("D0RPMeanP_B%d_phi%d",j,i))->Clone(Form("D0RPMeanPUpg_B%d_phi%d",j,i)));
-	}
-	if(resfileUpg->Get(Form("D0RPMeanK_B%d_phi%d",j,i))) {
-	  fD0RPMeanKUpg[j][i]=(TGraph*)(resfileUpg->Get(Form("D0RPMeanK_B%d_phi%d",j,i))->Clone(Form("D0RPMeanKUpg_B%d_phi%d",j,i)));
-	}
-	if(resfileUpg->Get(Form("D0RPMeanPi_B%d_phi%d",j,i))) {
-	  fD0RPMeanPiUpg[j][i]=(TGraph*)(resfileUpg->Get(Form("D0RPMeanPi_B%d_phi%d",j,i))->Clone(Form("D0RPMeanPiUpg_B%d_phi%d",j,i)));
-	}
-	if(resfileUpg->Get(Form("D0RPMeanE_B%d_phi%d",j,i))) {
-	  fD0RPMeanEUpg[j][i]=(TGraph*)(resfileUpg->Get(Form("D0RPMeanE_B%d_phi%d",j,i))->Clone(Form("D0RPMeanEUpg_B%d_phi%d",j,i)));
-	}
-      }
-    }
-    if(resfileUpg->Get("D0ZResP"  )) {
-      fD0ZResPUpg  =(TGraph*)(resfileUpg->Get("D0ZResP"  )->Clone("D0ZResPUpg"  ));
-    }
-    if(resfileUpg->Get("D0ZResK"  )) {
-      fD0ZResKUpg  =(TGraph*)(resfileUpg->Get("D0ZResK"  )->Clone("D0ZResKUpg"  ));
-    }
-    if(resfileUpg->Get("D0ZResPi" )) {
-      fD0ZResPiUpg =(TGraph*)(resfileUpg->Get("D0ZResPi" )->Clone("D0ZResPiUpg" ));
-    }
-    if(resfileUpg->Get("D0ZResE" )) {
-      fD0ZResEUpg =(TGraph*)(resfileUpg->Get("D0ZResE" )->Clone("D0ZResEUpg" ));
-    }
-    if(resfileUpg->Get("Pt1ResP"  )) {
-      fPt1ResPUpg  =(TGraph*)(resfileUpg->Get("Pt1ResP"  )->Clone("Pt1ResPUpg"  ));
-    }
-    if(resfileUpg->Get("Pt1ResK"  )) {
-      fPt1ResKUpg  =(TGraph*)(resfileUpg->Get("Pt1ResK"  )->Clone("Pt1ResKUpg"  ));
-    }
-    if(resfileUpg->Get("Pt1ResPi" )) {
-      fPt1ResPiUpg =(TGraph*)(resfileUpg->Get("Pt1ResPi" )->Clone("Pt1ResPiUpg" ));
-    }
-    if(resfileUpg->Get("Pt1ResE" )) {
-      fPt1ResEUpg =(TGraph*)(resfileUpg->Get("Pt1ResE" )->Clone("Pt1ResEUpg" ));
-    }
-    if(resfileUpg->Get("D0RPResPSA" )) {
-      fD0RPResPUpgSA =(TGraph*)(resfileUpg->Get("D0RPResPSA" )->Clone("D0RPResPUpgSA" ));
-    }
-    if(resfileUpg->Get("D0RPResKSA" )) {
-      fD0RPResKUpgSA =(TGraph*)(resfileUpg->Get("D0RPResKSA" )->Clone("D0RPResKUpgSA" ));
-    }
-    if(resfileUpg->Get("D0RPResPiSA")) {
-      fD0RPResPiUpgSA=(TGraph*)(resfileUpg->Get("D0RPResPiSA")->Clone("D0RPResPiUpgSA"));
-    }
-    if(resfileUpg->Get("D0RPResESA")) {
-      fD0RPResEUpgSA=(TGraph*)(resfileUpg->Get("D0RPResESA")->Clone("D0RPResEUpgSA"));
-    }
-    if(resfileUpg->Get("D0ZResPSA"  )) {
-      fD0ZResPUpgSA  =(TGraph*)(resfileUpg->Get("D0ZResPSA"  )->Clone("D0ZResPUpgSA"  ));
-    }
-    if(resfileUpg->Get("D0ZResKSA"  )) {
-      fD0ZResKUpgSA  =(TGraph*)(resfileUpg->Get("D0ZResKSA"  )->Clone("D0ZResKUpgSA"  ));
-    }
-    if(resfileUpg->Get("D0ZResPiSA" )) {
-      fD0ZResPiUpgSA =(TGraph*)(resfileUpg->Get("D0ZResPiSA" )->Clone("D0ZResPiUpgSA" ));
-    }
-    if(resfileUpg->Get("D0ZResESA" )) {
-      fD0ZResEUpgSA =(TGraph*)(resfileUpg->Get("D0ZResESA" )->Clone("D0ZResEUpgSA" ));
-    }
-    if(resfileUpg->Get("Pt1ResPSA"  )) {
-      fPt1ResPUpgSA  =(TGraph*)(resfileUpg->Get("Pt1ResPSA"  )->Clone("Pt1ResPUpgSA"  ));
-    }
-    if(resfileUpg->Get("Pt1ResKSA"  )) {
-      fPt1ResKUpgSA  =(TGraph*)(resfileUpg->Get("Pt1ResKSA"  )->Clone("Pt1ResKUpgSA"  ));
-    }
-    if(resfileUpg->Get("Pt1ResPiSA" )) {
-      fPt1ResPiUpgSA =(TGraph*)(resfileUpg->Get("Pt1ResPiSA" )->Clone("Pt1ResPiUpgSA" ));
-    }
-    if(resfileUpg->Get("Pt1ResESA" )) {
-      fPt1ResEUpgSA =(TGraph*)(resfileUpg->Get("Pt1ResESA" )->Clone("Pt1ResEUpgSA" ));
-    }
-    delete resfileUpg;
-  }
     
   DefineOutput(1,TList::Class());
 }
@@ -496,7 +304,10 @@ void AliAnalysisTaskSEImproveITS::UserExec(Option_t*) {
   AliAODEvent *ev=0x0;
   AliESDEvent *evesd=0x0;
   Double_t bz=0.;
-
+  if (!fFilesOpen) {	// check (run-once) that files have been opened
+    OpenImproverHistos();
+    if (!fFilesOpen) AliFatal("Error in opening improver files !");
+   }
   if(fIsAOD) {
     if(!fRunInVertexing) {
       ev=dynamic_cast<AliAODEvent*>(InputEvent());
@@ -1072,6 +883,263 @@ Int_t AliAnalysisTaskSEImproveITS::PhiBin(Double_t phi) const {
   if((phi>3.*(pi/4.)) && (phi<=5.*(pi/4.))) return 2;
   if((phi>(5.*pi/4.)) && (phi<=7.*(pi/4.))) return 3;
   return -1;
+}
+
+void AliAnalysisTaskSEImproveITS::OpenImproverHistos() {
+
+   TString lProductionName = ""; 
+   TString currentfilename = ((AliAnalysisManager::GetAnalysisManager()->GetInputEventHandler()->GetTree()->GetCurrentFile()))->GetName();
+    //2016
+    if ( run >= 252235 && run <= 252375 ) lProductionName = "LHC16d";
+    if ( run >= 252603 && run <= 253591 ) lProductionName = "LHC16e";
+    if ( run >= 254124 && run <= 254332 ) lProductionName = "LHC16g";
+    if ( run >= 254378 && run <= 255467 ) lProductionName = "LHC16h";
+    if ( run >= 256146 && run <= 256420 ) lProductionName = "LHC16j";
+    if ( run >= 256504 && run <= 258537 ) lProductionName = "LHC16k";
+    if ( run >= 258883 && run <= 260187 ) lProductionName = "LHC16l";
+    if ( run >= 262395 && run <= 264035 ) lProductionName = "LHC16o";
+    if ( run >= 264076 && run <= 264347 ) lProductionName = "LHC16p";
+    
+    //2017
+    if ( run >= 270822 && run <= 270830 ) lProductionName = "LHC17e";
+    if ( run >= 270854 && run <= 270865 ) lProductionName = "LHC17f";
+    if ( run >= 270882 && run <= 271777 ) lProductionName = "LHC17g";
+    if ( run >= 271868 && run <= 273103 ) lProductionName = "LHC17h";
+    if ( run >= 273591 && run <= 274442 ) lProductionName = "LHC17i";
+    if ( run >= 274593 && run <= 274671 ) lProductionName = "LHC17j";
+    if ( run >= 274690 && run <= 276508 ) lProductionName = "LHC17k";
+    if ( run >= 276551 && run <= 278216 ) lProductionName = "LHC17l";
+    if ( run >= 278914 && run <= 280140 ) lProductionName = "LHC17m";
+    if ( run >= 280282 && run <= 281961 ) lProductionName = "LHC17o";
+    if ( run >= 282504 && run <= 282704 ) lProductionName = "LHC17r";
+   
+    //2017: LHC17pq
+ 
+    if ( (run >= 282008 && run <= 282343) || (run >= 282365 && run <= 282367) ) { //check trigger cluster CENT or FAST
+	if (currentfilename.Contains("cent")) lProductionName = "LHC17pq_cent";
+	if (currentfilename.Contains("fast")) lProductionName = "LCH17pq_fast";
+}
+
+    //Registered Productions : Run 2 Pb-Pb
+    if ( run >= 244917 && run <= 246994 ) lProductionName = "LHC15o";
+    
+    //Registered Productions : Run 2 p-Pb
+    if ( (run >= 265115 && run <= 265525) || (run >=267161 && run <= 267166) ) lProductionName = "LHC16qt";
+     
+    //Registered production: Run 2 Pb-Pb 2018 [to be uncommented when improver files avaiable]
+//    if ( run >= 295581 && run <= 296689 ) lProductionName = "LHC18q";
+//    if ( run >= 296690 && run <= 300000 ) lProductionName = "LHC18r";
+
+  if (!lProductionName) {
+   AliWarning("This run number has no corresponding improver file!");
+   return;
+  }  
+  if (!fImproverSuffix) fImproverSuffix = "central"; // default path is "central"
+
+  TString pathToFileCurrent = AliDataFile::GetFileName(Form("PWGHF/common/%s/%s/ITSgraphs_Current.root",lProductionName.Data(),fImproverSuffix.Data()));  // find URI for improver file from CVMFS
+
+  TFile *resfileCur=TFile::Open(pathToFileCurrent.Data());
+  if(resfileCur) {    
+    if(resfileCur->Get("D0RPResP" )) {
+      fD0RPResPCur =(TGraph*)(resfileCur->Get("D0RPResP" )->Clone("D0RPResPCur" ));
+    }
+    if(resfileCur->Get("D0RPResK" )) {
+      fD0RPResKCur =(TGraph*)(resfileCur->Get("D0RPResK" )->Clone("D0RPResKCur" ));
+    }
+    if(resfileCur->Get("D0RPResPi")) {
+      fD0RPResPiCur=(TGraph*)(resfileCur->Get("D0RPResPi")->Clone("D0RPResPiCur"));
+    }
+    if(resfileCur->Get("D0RPResE")) {
+      fD0RPResECur=(TGraph*)(resfileCur->Get("D0RPResE")->Clone("D0RPResECur"));
+    }
+    if(resfileCur->Get("D0RPSigmaPullRatioP" )) {
+      fD0RPSigmaPullRatioP =(TGraph*)(resfileCur->Get("D0RPSigmaPullRatioP" ));
+    }
+    if(resfileCur->Get("D0RPSigmaPullRatioK" )) {
+      fD0RPSigmaPullRatioK =(TGraph*)(resfileCur->Get("D0RPSigmaPullRatioK" ));
+    }
+    if(resfileCur->Get("D0RPSigmaPullRatioPi")) {
+      fD0RPSigmaPullRatioPi=(TGraph*)(resfileCur->Get("D0RPSigmaPullRatioPi"));
+    }
+    if(resfileCur->Get("D0RPSigmaPullRatioE")) {
+      fD0RPSigmaPullRatioE=(TGraph*)(resfileCur->Get("D0RPSigmaPullRatioE"));
+    }
+    for(Int_t j=0; j<2; j++){
+      for(Int_t i=0; i<4; i++){
+	if(resfileCur->Get(Form("D0RPMeanP_B%d_phi%d",j,i))) {
+	  fD0RPMeanPCur[j][i]=(TGraph*)(resfileCur->Get(Form("D0RPMeanP_B%d_phi%d",j,i))->Clone(Form("D0RPMeanPCur_B%d_phi%d",j,i)));
+	}
+	if(resfileCur->Get(Form("D0RPMeanK_B%d_phi%d",j,i))) {
+	  fD0RPMeanKCur[j][i]=(TGraph*)(resfileCur->Get(Form("D0RPMeanK_B%d_phi%d",j,i))->Clone(Form("D0RPMeanKCur_B%d_phi%d",j,i)));
+	}
+	if(resfileCur->Get(Form("D0RPMeanPi_B%d_phi%d",j,i))) {
+	  fD0RPMeanPiCur[j][i]=(TGraph*)(resfileCur->Get(Form("D0RPMeanPi_B%d_phi%d",j,i))->Clone(Form("D0RPMeanPiCur_B%d_phi%d",j,i)));
+	}
+	if(resfileCur->Get(Form("D0RPMeanE_B%d_phi%d",j,i))) {
+	  fD0RPMeanECur[j][i]=(TGraph*)(resfileCur->Get(Form("D0RPMeanE_B%d_phi%d",j,i))->Clone(Form("D0RPMeanECur_B%d_phi%d",j,i)));
+	}
+      }
+    }
+    if(resfileCur->Get("D0ZResP"  )) {
+      fD0ZResPCur  =(TGraph*)(resfileCur->Get("D0ZResP"  )->Clone("D0ZResPCur"  ));
+    }
+    if(resfileCur->Get("D0ZResK"  )) {
+      fD0ZResKCur  =(TGraph*)(resfileCur->Get("D0ZResK"  )->Clone("D0ZResKCur"  ));
+    }
+    if(resfileCur->Get("D0ZResPi" )) {
+      fD0ZResPiCur =(TGraph*)(resfileCur->Get("D0ZResPi" )->Clone("D0ZResPiCur" ));
+    }
+    if(resfileCur->Get("D0ZResE" )) {
+      fD0ZResECur =(TGraph*)(resfileCur->Get("D0ZResE" )->Clone("D0ZResECur" ));
+    }
+    if(resfileCur->Get("Pt1ResP"  )) {
+      fPt1ResPCur  =(TGraph*)(resfileCur->Get("Pt1ResP"  )->Clone("Pt1ResPCur"  ));
+    }
+    if(resfileCur->Get("Pt1ResK"  )) {
+      fPt1ResKCur  =(TGraph*)(resfileCur->Get("Pt1ResK"  )->Clone("Pt1ResKCur"  ));
+    }
+    if(resfileCur->Get("Pt1ResPi" )) {
+      fPt1ResPiCur =(TGraph*)(resfileCur->Get("Pt1ResPi" )->Clone("Pt1ResPiCur" ));
+    }
+    if(resfileCur->Get("Pt1ResE" )) {
+      fPt1ResECur =(TGraph*)(resfileCur->Get("Pt1ResE" )->Clone("Pt1ResECur" ));
+    }
+    if(resfileCur->Get("D0RPResPSA" )) {
+      fD0RPResPCurSA =(TGraph*)(resfileCur->Get("D0RPResPSA" )->Clone("D0RPResPCurSA" ));
+    }
+    if(resfileCur->Get("D0RPResKSA" )) {
+      fD0RPResKCurSA =(TGraph*)(resfileCur->Get("D0RPResKSA" )->Clone("D0RPResKCurSA" ));
+    }
+    if(resfileCur->Get("D0RPResPiSA")) {
+      fD0RPResPiCurSA=(TGraph*)(resfileCur->Get("D0RPResPiSA")->Clone("D0RPResPiCurSA"));
+    }
+    if(resfileCur->Get("D0RPResESA")) {
+      fD0RPResECurSA=(TGraph*)(resfileCur->Get("D0RPResESA")->Clone("D0RPResECurSA"));
+    }
+    if(resfileCur->Get("D0ZResPSA"  )) {
+      fD0ZResPCurSA  =(TGraph*)(resfileCur->Get("D0ZResPSA"  )->Clone("D0ZResPCurSA"  ));
+    }
+    if(resfileCur->Get("D0ZResKSA"  )) {
+      fD0ZResKCurSA  =(TGraph*)(resfileCur->Get("D0ZResKSA"  )->Clone("D0ZResKCurSA"  ));
+    }
+    if(resfileCur->Get("D0ZResPiSA" )) {
+      fD0ZResPiCurSA =(TGraph*)(resfileCur->Get("D0ZResPiSA" )->Clone("D0ZResPiCurSA" ));
+    }
+    if(resfileCur->Get("D0ZResESA" )) {
+      fD0ZResECurSA =(TGraph*)(resfileCur->Get("D0ZResESA" )->Clone("D0ZResECurSA" ));
+    }
+    if(resfileCur->Get("Pt1ResPSA"  )) {
+      fPt1ResPCurSA  =(TGraph*)(resfileCur->Get("Pt1ResPSA"  )->Clone("Pt1ResPCurSA"  ));
+    }
+    if(resfileCur->Get("Pt1ResKSA"  )) {
+      fPt1ResKCurSA  =(TGraph*)(resfileCur->Get("Pt1ResKSA"  )->Clone("Pt1ResKCurSA"  ));
+    }
+    if(resfileCur->Get("Pt1ResPiSA" )) {
+      fPt1ResPiCurSA =(TGraph*)(resfileCur->Get("Pt1ResPiSA" )->Clone("Pt1ResPiCurSA" ));
+    }
+    if(resfileCur->Get("Pt1ResESA" )) {
+      fPt1ResECurSA =(TGraph*)(resfileCur->Get("Pt1ResESA" )->Clone("Pt1ResECurSA" ));
+    }
+    delete resfileCur;
+  }
+    
+  TString pathToFileUpgrade = AliDataFile::GetFileName(Form("PWGHF/common/%s/%s/ITSgraphs_NewAll-X0.3-Res4um.root",lProductionName.Data(),fImproverSuffix.Data()));
+
+  TFile *resfileUpg=TFile::Open(pathToFileUpgrade.Data());
+
+  if(resfileUpg) {
+    if(resfileUpg->Get("D0RPResP" )) {
+      fD0RPResPUpg =(TGraph*)(resfileUpg->Get("D0RPResP" )->Clone("D0RPResPUpg" ));
+    }
+    if(resfileUpg->Get("D0RPResK" )) {
+      fD0RPResKUpg =(TGraph*)(resfileUpg->Get("D0RPResK" )->Clone("D0RPResKUpg" ));
+    }
+    if(resfileUpg->Get("D0RPResPi")) {
+      fD0RPResPiUpg=(TGraph*)(resfileUpg->Get("D0RPResPi")->Clone("D0RPResPiUpg"));
+    }
+    if(resfileUpg->Get("D0RPResE")) {
+      fD0RPResEUpg=(TGraph*)(resfileUpg->Get("D0RPResE")->Clone("D0RPResEUpg"));
+    }
+    for(Int_t j=0; j<2; j++){
+      for(Int_t i=0; i<4; i++){
+	if(resfileUpg->Get(Form("D0RPMeanP_B%d_phi%d",j,i))) {
+	  fD0RPMeanPUpg[j][i]=(TGraph*)(resfileUpg->Get(Form("D0RPMeanP_B%d_phi%d",j,i))->Clone(Form("D0RPMeanPUpg_B%d_phi%d",j,i)));
+	}
+	if(resfileUpg->Get(Form("D0RPMeanK_B%d_phi%d",j,i))) {
+	  fD0RPMeanKUpg[j][i]=(TGraph*)(resfileUpg->Get(Form("D0RPMeanK_B%d_phi%d",j,i))->Clone(Form("D0RPMeanKUpg_B%d_phi%d",j,i)));
+	}
+	if(resfileUpg->Get(Form("D0RPMeanPi_B%d_phi%d",j,i))) {
+	  fD0RPMeanPiUpg[j][i]=(TGraph*)(resfileUpg->Get(Form("D0RPMeanPi_B%d_phi%d",j,i))->Clone(Form("D0RPMeanPiUpg_B%d_phi%d",j,i)));
+	}
+	if(resfileUpg->Get(Form("D0RPMeanE_B%d_phi%d",j,i))) {
+	  fD0RPMeanEUpg[j][i]=(TGraph*)(resfileUpg->Get(Form("D0RPMeanE_B%d_phi%d",j,i))->Clone(Form("D0RPMeanEUpg_B%d_phi%d",j,i)));
+	}
+      }
+    }
+    if(resfileUpg->Get("D0ZResP"  )) {
+      fD0ZResPUpg  =(TGraph*)(resfileUpg->Get("D0ZResP"  )->Clone("D0ZResPUpg"  ));
+    }
+    if(resfileUpg->Get("D0ZResK"  )) {
+      fD0ZResKUpg  =(TGraph*)(resfileUpg->Get("D0ZResK"  )->Clone("D0ZResKUpg"  ));
+    }
+    if(resfileUpg->Get("D0ZResPi" )) {
+      fD0ZResPiUpg =(TGraph*)(resfileUpg->Get("D0ZResPi" )->Clone("D0ZResPiUpg" ));
+    }
+    if(resfileUpg->Get("D0ZResE" )) {
+      fD0ZResEUpg =(TGraph*)(resfileUpg->Get("D0ZResE" )->Clone("D0ZResEUpg" ));
+    }
+    if(resfileUpg->Get("Pt1ResP"  )) {
+      fPt1ResPUpg  =(TGraph*)(resfileUpg->Get("Pt1ResP"  )->Clone("Pt1ResPUpg"  ));
+    }
+    if(resfileUpg->Get("Pt1ResK"  )) {
+      fPt1ResKUpg  =(TGraph*)(resfileUpg->Get("Pt1ResK"  )->Clone("Pt1ResKUpg"  ));
+    }
+    if(resfileUpg->Get("Pt1ResPi" )) {
+      fPt1ResPiUpg =(TGraph*)(resfileUpg->Get("Pt1ResPi" )->Clone("Pt1ResPiUpg" ));
+    }
+    if(resfileUpg->Get("Pt1ResE" )) {
+      fPt1ResEUpg =(TGraph*)(resfileUpg->Get("Pt1ResE" )->Clone("Pt1ResEUpg" ));
+    }
+    if(resfileUpg->Get("D0RPResPSA" )) {
+      fD0RPResPUpgSA =(TGraph*)(resfileUpg->Get("D0RPResPSA" )->Clone("D0RPResPUpgSA" ));
+    }
+    if(resfileUpg->Get("D0RPResKSA" )) {
+      fD0RPResKUpgSA =(TGraph*)(resfileUpg->Get("D0RPResKSA" )->Clone("D0RPResKUpgSA" ));
+    }
+    if(resfileUpg->Get("D0RPResPiSA")) {
+      fD0RPResPiUpgSA=(TGraph*)(resfileUpg->Get("D0RPResPiSA")->Clone("D0RPResPiUpgSA"));
+    }
+    if(resfileUpg->Get("D0RPResESA")) {
+      fD0RPResEUpgSA=(TGraph*)(resfileUpg->Get("D0RPResESA")->Clone("D0RPResEUpgSA"));
+    }
+    if(resfileUpg->Get("D0ZResPSA"  )) {
+      fD0ZResPUpgSA  =(TGraph*)(resfileUpg->Get("D0ZResPSA"  )->Clone("D0ZResPUpgSA"  ));
+    }
+    if(resfileUpg->Get("D0ZResKSA"  )) {
+      fD0ZResKUpgSA  =(TGraph*)(resfileUpg->Get("D0ZResKSA"  )->Clone("D0ZResKUpgSA"  ));
+    }
+    if(resfileUpg->Get("D0ZResPiSA" )) {
+      fD0ZResPiUpgSA =(TGraph*)(resfileUpg->Get("D0ZResPiSA" )->Clone("D0ZResPiUpgSA" ));
+    }
+    if(resfileUpg->Get("D0ZResESA" )) {
+      fD0ZResEUpgSA =(TGraph*)(resfileUpg->Get("D0ZResESA" )->Clone("D0ZResEUpgSA" ));
+    }
+    if(resfileUpg->Get("Pt1ResPSA"  )) {
+      fPt1ResPUpgSA  =(TGraph*)(resfileUpg->Get("Pt1ResPSA"  )->Clone("Pt1ResPUpgSA"  ));
+    }
+    if(resfileUpg->Get("Pt1ResKSA"  )) {
+      fPt1ResKUpgSA  =(TGraph*)(resfileUpg->Get("Pt1ResKSA"  )->Clone("Pt1ResKUpgSA"  ));
+    }
+    if(resfileUpg->Get("Pt1ResPiSA" )) {
+      fPt1ResPiUpgSA =(TGraph*)(resfileUpg->Get("Pt1ResPiSA" )->Clone("Pt1ResPiUpgSA" ));
+    }
+    if(resfileUpg->Get("Pt1ResESA" )) {
+      fPt1ResEUpgSA =(TGraph*)(resfileUpg->Get("Pt1ResESA" )->Clone("Pt1ResEUpgSA" ));
+    }
+    delete resfileUpg;
+  }
+
+   fFilesOpen = kTRUE;
 }
 
 ClassImp(AliAnalysisTaskSEImproveITS);
