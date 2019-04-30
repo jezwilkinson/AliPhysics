@@ -1392,9 +1392,14 @@ void AddTask_GammaCalo_pp(
   } else if (trainConfig ==806){//Comparing CellQA Config from GammaConv
     cuts.AddCutCalo("00010113","2446600000012300000","0163103100000010"); // INT7
   } else if (trainConfig ==807){//Non Lin Studies
-    cuts.AddCutCalo("00010113","2446600000013300000","0163103100000010"); // INT7
-    cuts.AddCutCalo("00010113","2446611000013300000","0163103100000010"); // INT7 //case 11=> FunctionNL_kSDM
-    cuts.AddCutCalo("00010113","2446621000013300000","0163103100000010"); // INT7 //case 21=> unctionNL_DPOW
+    cuts.AddCutCalo("00010113","2446600044012300000","0163103100000010"); // INT7
+    cuts.AddCutCalo("00010113","2446611044012300000","0163103100000010"); // INT7 //case 11=> FunctionNL_kSDM
+    cuts.AddCutCalo("00010113","2446621044012300000","0163103100000010"); // INT7 //case 21=> unctionNL_DPOW
+  } else if (trainConfig ==808){//PHOS Triggers with case 11 NonLin (FunctionNL_kSDM)
+    cuts.AddCutCalo("00010113","2446611044012300000","0163103100000010"); //no Trigger
+    cuts.AddCutCalo("00061113","2446611044012300000","0163103100000010"); //PHI1
+    cuts.AddCutCalo("00062113","2446611044012300000","0163103100000010"); //PHI7
+    cuts.AddCutCalo("00063113","2446611044012300000","0163103100000010"); //PHI8
 
 
   // *********************************************************************************************************
@@ -1520,6 +1525,11 @@ void AddTask_GammaCalo_pp(
     cuts.AddCutCalo("00010113","411790007f032230000","01631031000000d0"); // no NL, E/p TM, tight timing
     cuts.AddCutCalo("00010113","411790005f032230000","01631031000000d0"); // no NL, E/p TM, -50ns, 30ns timing cut
     cuts.AddCutCalo("00010113","411790000f032230000","01631031000000d0"); // no NL, E/p TM, open timing
+  } else if (trainConfig == 2018){ // EMCAL+DCAL clusters standard cuts
+    cuts.AddCutCalo("00010113","411791105f032230000","01631031000000d0"); // std TM, -50ns, 30ns timing cut
+    cuts.AddCutCalo("00010113","411791205f032230000","01631031000000d0"); // std TM, -50ns, 30ns timing cut
+    cuts.AddCutCalo("00010113","411792105f032230000","01631031000000d0"); // std TM, -50ns, 30ns timing cut
+    cuts.AddCutCalo("00010113","411792205f032230000","01631031000000d0"); // std TM, -50ns, 30ns timing cut
 
 // EDC 13 TeV 2016 & 2017 settings with MC fine tuning correction
   } else if (trainConfig == 2020){ // EMCAL+DCAL clusters standard cuts, INT7, NL , std TM, tight timing
@@ -1611,6 +1621,10 @@ void AddTask_GammaCalo_pp(
     TString caloCutPos = cuts.GetClusterCut(i);
     caloCutPos.Resize(1);
     TString TrackMatcherName = Form("CaloTrackMatcher_%s_%i",caloCutPos.Data(),trackMatcherRunningMode);
+    if(corrTaskSetting.CompareTo("")){
+      TrackMatcherName = TrackMatcherName+"_"+corrTaskSetting.Data();
+      cout << "Using separate track matcher for correction framework setting: " << TrackMatcherName.Data() << endl;
+    }
     if( !(AliCaloTrackMatcher*)mgr->GetTask(TrackMatcherName.Data()) ){
       AliCaloTrackMatcher* fTrackMatcher = new AliCaloTrackMatcher(TrackMatcherName.Data(),caloCutPos.Atoi(),trackMatcherRunningMode);
       fTrackMatcher->SetV0ReaderName(V0ReaderName);

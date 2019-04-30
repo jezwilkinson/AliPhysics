@@ -87,7 +87,6 @@ AliAnalysisTaskSELc2V0bachelorTMVAApp::AliAnalysisTaskSELc2V0bachelorTMVAApp():
   AliAnalysisTaskSE(),
   fUseMCInfo(kFALSE),
   fOutput(0),
-  fCEvents(0),
   fPIDResponse(0),
   fPIDCombined(0),
   fIsK0sAnalysis(kFALSE),
@@ -211,7 +210,9 @@ AliAnalysisTaskSELc2V0bachelorTMVAApp::AliAnalysisTaskSELc2V0bachelorTMVAApp():
   fBDTHistoVsCosThetaStar(0),
   fHistoNsigmaTPC(0),
   fHistoNsigmaTOF(0),
-  fDebugHistograms(kFALSE)
+  fDebugHistograms(kFALSE),
+  fAODProtection(1),
+  fUsePIDresponseForNsigma(kFALSE)
 {
   /// Default ctor
   //
@@ -222,7 +223,6 @@ AliAnalysisTaskSELc2V0bachelorTMVAApp::AliAnalysisTaskSELc2V0bachelorTMVAApp(con
   AliAnalysisTaskSE(name),
   fUseMCInfo(kFALSE),
   fOutput(0),
-  fCEvents(0),
   fPIDResponse(0),
   fPIDCombined(0),
   fIsK0sAnalysis(kFALSE),
@@ -346,7 +346,10 @@ AliAnalysisTaskSELc2V0bachelorTMVAApp::AliAnalysisTaskSELc2V0bachelorTMVAApp(con
   fBDTHistoVsCosThetaStar(0),
   fHistoNsigmaTPC(0),
   fHistoNsigmaTOF(0),
-  fDebugHistograms(kFALSE)
+  fDebugHistograms(kFALSE),
+  fAODProtection(1),
+  fUsePIDresponseForNsigma(kFALSE)
+
 {
   //
   /// Constructor. Initialization of Inputs and Outputs
@@ -515,7 +518,7 @@ void AliAnalysisTaskSELc2V0bachelorTMVAApp::UserCreateOutputObjects() {
   fVariablesTreeBkg = new TTree(Form("%s_Bkg", nameoutput), "Candidates variables tree, Background");
 
   Int_t nVar; 
-  if (fUseMCInfo)  nVar = 49; //"full" tree if MC
+  if (fUseMCInfo)  nVar = 52; //"full" tree if MC
   else nVar = 33; //"reduced" tree if data
   
   fCandidateVariables = new Float_t [nVar];
@@ -571,6 +574,9 @@ void AliAnalysisTaskSELc2V0bachelorTMVAApp::UserCreateOutputObjects() {
     fCandidateVariableNames[46] = "centrality";
     fCandidateVariableNames[47] = "NtrkAll";
     fCandidateVariableNames[48] = "origin";
+    fCandidateVariableNames[49] = "nSigmaTPCpi";
+    fCandidateVariableNames[50] = "nSigmaTPCka";
+    fCandidateVariableNames[51] = "bachTPCmom";
   }
   else {   // "light mode"
     fCandidateVariableNames[0] = "massLc2K0Sp";
@@ -590,16 +596,16 @@ void AliAnalysisTaskSELc2V0bachelorTMVAApp::UserCreateOutputObjects() {
     fCandidateVariableNames[14] = "dcaV0pos";
     fCandidateVariableNames[15] = "dcaV0neg";
     fCandidateVariableNames[16] = "v0Pt";
-    fCandidateVariableNames[17] = "massGamma";
+    fCandidateVariableNames[17] = "bachTPCmom";
     fCandidateVariableNames[18] = "LcPt";
     fCandidateVariableNames[19] = "combinedProtonProb";
     fCandidateVariableNames[20] = "V0positiveEta";
-    fCandidateVariableNames[21] = "V0negativeEta";
+    fCandidateVariableNames[21] = "bachelorP"; // we replaced the V0negativeEta with the bachelor P as this is more useful (for PID) while the V0 daughters' eta we don't use... And are practically the same (positive and negative)
     fCandidateVariableNames[22] = "bachelorEta";
     fCandidateVariableNames[23] = "v0P";
     fCandidateVariableNames[24] = "DecayLengthK0S";
-    fCandidateVariableNames[25] = "alphaArm";
-    fCandidateVariableNames[26] = "ptArm";
+    fCandidateVariableNames[25] = "nSigmaTPCpi";
+    fCandidateVariableNames[26] = "nSigmaTPCka";
     fCandidateVariableNames[27] = "NtrkRaw";
     fCandidateVariableNames[28] = "NtrkCorr";
     fCandidateVariableNames[29] = "CosThetaStar";
@@ -615,8 +621,8 @@ void AliAnalysisTaskSELc2V0bachelorTMVAApp::UserCreateOutputObjects() {
   
   fHistoCentrality = new TH1F("fHistoCentrality", "fHistoCentrality", 100, 0., 100.);
 
-  fHistoEvents = new TH1F("fHistoEvents", "fHistoEvents", 2, -0.5, 1.5);
-  TString labelEv[2] = {"NotSelected", "Selected"};
+  fHistoEvents = new TH1F("fHistoEvents", "fHistoEvents", 4, -0.5, 3.5);
+  TString labelEv[4] = {"RejectedDeltaMismatch", "AcceptedDeltaMismatch", "NotSelected", "Selected"};
   for (Int_t ibin = 1; ibin <= fHistoEvents->GetNbinsX(); ibin++){
     fHistoEvents->GetXaxis()->SetBinLabel(ibin, labelEv[ibin-1].Data());
   }
@@ -973,6 +979,19 @@ void AliAnalysisTaskSELc2V0bachelorTMVAApp::UserExec(Option_t *)
   fCurrentEvent++;
   AliDebug(2, Form("Processing event = %d", fCurrentEvent));
   AliAODEvent* aodEvent = dynamic_cast<AliAODEvent*>(fInputEvent);
+
+  if(fAODProtection >= 0){
+    //   Protection against different number of events in the AOD and deltaAOD
+    //   In case of discrepancy the event is rejected.
+    Int_t matchingAODdeltaAODlevel = AliRDHFCuts::CheckMatchingAODdeltaAODevents();
+    if (matchingAODdeltaAODlevel < 0 || (matchingAODdeltaAODlevel == 0 && fAODProtection == 1)) {
+      // AOD/deltaAOD trees have different number of entries || TProcessID do not match while it was required
+      fHistoEvents->Fill(0);
+      return;
+    }
+    fHistoEvents->Fill(1);
+  }
+  
   TClonesArray *arrayLctopKos=0;
 
   TClonesArray *array3Prong = 0;
@@ -1060,10 +1079,10 @@ void AliAnalysisTaskSELc2V0bachelorTMVAApp::UserExec(Option_t *)
   fIsEventSelected = fAnalCuts->IsEventSelected(aodEvent);
 
   if ( !fIsEventSelected ) {
-    fHistoEvents->Fill(0);
+    fHistoEvents->Fill(2);
     return; // don't take into account not selected events
   }
-  fHistoEvents->Fill(1);
+  fHistoEvents->Fill(3);
 
   fHistoTracklets_1->Fill(fNTracklets_1);
   fHistoTracklets_All->Fill(fNTracklets_All);
@@ -1242,7 +1261,7 @@ void AliAnalysisTaskSELc2V0bachelorTMVAApp::MakeAnalysisForLc2prK0S(AliAODEvent 
 
   AliAnalysisVertexingHF *vHF = new AliAnalysisVertexingHF();
   for (Int_t iLctopK0s = 0; iLctopK0s < nCascades; iLctopK0s++) {
-
+    
     // Lc candidates and K0s from Lc
     AliAODRecoCascadeHF* lcK0spr = dynamic_cast<AliAODRecoCascadeHF*>(arrayLctopKos->At(iLctopK0s));
     if (!lcK0spr) {
@@ -1256,7 +1275,6 @@ void AliAnalysisTaskSELc2V0bachelorTMVAApp::MakeAnalysisForLc2prK0S(AliAODEvent 
     }
 
     if(!vHF->FillRecoCasc(aodEvent, lcK0spr, kFALSE)){ //Fill the data members of the candidate only if they are empty.
-      //fCEvents->Fill(18);//monitor how often this fails
       continue;
     }
     //if (!(vHF->RecoSecondaryVertexForCascades(aodEvent, lcK0spr))) continue;
@@ -1669,12 +1687,22 @@ void AliAnalysisTaskSELc2V0bachelorTMVAApp::FillLc2pK0Sspectrum(AliAODRecoCascad
     cutsAnal->GetPidHF()->GetnSigmaTOF(bachelor, 3, nSigmaTOFka);
   */
 
-  nSigmaTPCpi = fPIDResponse->NumberOfSigmasTPC(bachelor, (AliPID::kPion));
-  nSigmaTPCka = fPIDResponse->NumberOfSigmasTPC(bachelor, (AliPID::kKaon));
-  nSigmaTPCpr = fPIDResponse->NumberOfSigmasTPC(bachelor, (AliPID::kProton));
-  nSigmaTOFpi = fPIDResponse->NumberOfSigmasTOF(bachelor, (AliPID::kPion));
-  nSigmaTOFka = fPIDResponse->NumberOfSigmasTOF(bachelor, (AliPID::kKaon));
-  nSigmaTOFpr = fPIDResponse->NumberOfSigmasTOF(bachelor, (AliPID::kProton));
+  if (fUsePIDresponseForNsigma) {
+    nSigmaTPCpi = fPIDResponse->NumberOfSigmasTPC(bachelor, (AliPID::kPion));
+    nSigmaTPCka = fPIDResponse->NumberOfSigmasTPC(bachelor, (AliPID::kKaon));
+    nSigmaTPCpr = fPIDResponse->NumberOfSigmasTPC(bachelor, (AliPID::kProton));
+    nSigmaTOFpi = fPIDResponse->NumberOfSigmasTOF(bachelor, (AliPID::kPion));
+    nSigmaTOFka = fPIDResponse->NumberOfSigmasTOF(bachelor, (AliPID::kKaon));
+    nSigmaTOFpr = fPIDResponse->NumberOfSigmasTOF(bachelor, (AliPID::kProton));
+  }
+  else {
+    cutsAnal->GetPidHF()->GetnSigmaTPC(bachelor, (AliPID::kPion), nSigmaTPCpi);
+    cutsAnal->GetPidHF()->GetnSigmaTPC(bachelor, (AliPID::kKaon), nSigmaTPCka);
+    cutsAnal->GetPidHF()->GetnSigmaTPC(bachelor, (AliPID::kProton), nSigmaTPCpr);
+    cutsAnal->GetPidHF()->GetnSigmaTOF(bachelor, (AliPID::kPion), nSigmaTOFpi);
+    cutsAnal->GetPidHF()->GetnSigmaTOF(bachelor, (AliPID::kKaon), nSigmaTOFka);
+    cutsAnal->GetPidHF()->GetnSigmaTOF(bachelor, (AliPID::kProton), nSigmaTOFpr);    
+  }
   
   Double_t ptLcMC = -1;
   Double_t weightPythia = -1, weight5LHC13d3 = -1, weight5LHC13d3Lc = -1; 
@@ -1849,6 +1877,9 @@ void AliAnalysisTaskSELc2V0bachelorTMVAApp::FillLc2pK0Sspectrum(AliAODRecoCascad
 	fCandidateVariables[48] = fUtils->CheckOrigin(mcArray, partLcMC, kTRUE);
       else
 	fCandidateVariables[48] = -1;
+      fCandidateVariables[49] = nSigmaTPCpi;
+      fCandidateVariables[50] = nSigmaTPCka;
+      fCandidateVariables[51] = bachelor->GetTPCmomentum();
     }      
     else { //remove MC-only variables from tree if data
       fCandidateVariables[0] = invmassLc;
@@ -1868,11 +1899,11 @@ void AliAnalysisTaskSELc2V0bachelorTMVAApp::FillLc2pK0Sspectrum(AliAODRecoCascad
       fCandidateVariables[14] = v0part->Getd0Prong(0);
       fCandidateVariables[15] = v0part->Getd0Prong(1);
       fCandidateVariables[16] = v0part->Pt();
-      fCandidateVariables[17] = v0part->InvMass2Prongs(0,1,11,11);
+      fCandidateVariables[17] = bachelor->GetTPCmomentum();
       fCandidateVariables[18] = part->Pt();
       fCandidateVariables[19] = probProton;
       fCandidateVariables[20] = v0pos->Eta();
-      fCandidateVariables[21] = v0neg->Eta();
+      fCandidateVariables[21] = bachelor->P();
       fCandidateVariables[22] = bachelor->Eta();
       fCandidateVariables[23] = v0part->P();
       fCandidateVariables[24] = part->DecayLengthV0();

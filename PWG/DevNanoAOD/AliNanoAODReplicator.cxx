@@ -68,6 +68,8 @@ class AliAODRecoDecay;
 #include "TCanvas.h"
 #include "AliNanoAODHeader.h"
 #include "AliNanoAODCustomSetter.h"
+#include "AliV0ReaderV1.h"
+#include "AliAODConversionPhoton.h"
 
 using std::cout;
 using std::endl;
@@ -80,6 +82,7 @@ AliAODBranchReplicator(),
   fTrackCuts(0), 
   fV0Cuts(0), 
   fCascadeCuts(0), 
+  fConversionPhotonCuts(0),
   fTracks(0x0), 
   fHeader(0x0), 
   fVertices(0x0), 
@@ -97,10 +100,12 @@ AliAODBranchReplicator(),
   fAodZDC(0x0),
   fV0s(0x0),
   fCascades(0x0),
+  fConversionPhotons(0x0),
   fSaveZDC(0),
   fSaveVzero(0),
   fSaveV0s(0),
   fSaveCascades(kFALSE),
+  fSaveConversionPhotons(kFALSE),
   fInputArrayName(""),
   fOutputArrayName("tracks")
   {
@@ -112,6 +117,7 @@ AliNanoAODReplicator::AliNanoAODReplicator(const char* name, const char* title) 
   fTrackCuts(0), 
   fV0Cuts(0), 
   fCascadeCuts(0), 
+  fConversionPhotonCuts(0),
   fTracks(0x0), 
   fHeader(0x0), 
   fVertices(0x0), 
@@ -129,10 +135,12 @@ AliNanoAODReplicator::AliNanoAODReplicator(const char* name, const char* title) 
   fAodZDC(0x0),
   fV0s(0x0),
   fCascades(0x0),
+  fConversionPhotons(0x0),
   fSaveZDC(0),
   fSaveVzero(0),
   fSaveV0s(0),
   fSaveCascades(kFALSE),
+  fSaveConversionPhotons(kFALSE),
   fInputArrayName(""),
   fOutputArrayName("tracks")
 {
@@ -419,6 +427,14 @@ TList* AliNanoAODReplicator::GetList() const
   
   if (!fList)
     {
+      // sanity checks
+      if (fSaveConversionPhotons) {
+        // check if id field is in fVarList
+        AliNanoAODTrackMapping::GetInstance(fVarList);
+        if (AliNanoAODTrackMapping::GetInstance()->GetVarIndex("ID") == -1)
+          AliFatal("Conversion Photons requested but field 'id' missing in track variables");
+      }
+      
       fList = new TList;
       fList->SetOwner(kTRUE);
 
@@ -432,6 +448,9 @@ TList* AliNanoAODReplicator::GetList() const
           if (fVarListHeader.Data()[i] == ',') numberOfHeaderParam++;
       }
       
+      if (fVarListHeader.Contains("T0Spread"))
+        numberOfHeaderParam+=3;
+      
       if (fVarListHeader.CompareTo("")==0) 
         numberOfHeaderParam = 2;
       else 
@@ -441,13 +460,7 @@ TList* AliNanoAODReplicator::GetList() const
       numberOfHeaderParam -= numberOfHeaderParamInt;
       fHeader = new AliNanoAODHeader(numberOfHeaderParam, numberOfHeaderParamInt);
 
-      // HACK for missing initializing upstream in AliRoot (v5-09-46). Wait for next tag.
-      fHeader->SetFiredTriggerClassesIndex(-1);
-      fHeader->SetBunchCrossNumberIndex(-1);
-      fHeader->SetOrbitNumberIndex(-1);
-      fHeader->SetPeriodNumberIndex(-1);
-
-      fHeader->SetName("header"); // TODO: consider the possibility to use a different name to distinguish in AliAODEvent
+      fHeader->SetName("header");
       fList->Add(fHeader);    
         
       if(fSaveVzero){
@@ -470,6 +483,12 @@ TList* AliNanoAODReplicator::GetList() const
           fCascades = new TClonesArray("AliAODcascade",2);
           fCascades->SetName("cascades");
           fList->Add(fCascades);
+      }
+      
+      if(fSaveConversionPhotons){
+          fConversionPhotons = new TClonesArray("AliAODConversionPhoton",2);
+          fConversionPhotons->SetName("conversionphotons");
+          fList->Add(fConversionPhotons);
       }
 
       fVertices = new TClonesArray("AliAODVertex",2);
@@ -504,6 +523,9 @@ void AliNanoAODReplicator::ReplicateAndFilter(const AliAODEvent& source)
   if (fCascades)
     fCascades->Clear("C");
   
+  if (fConversionPhotons)
+    fConversionPhotons->Clear("C");
+  
   if (fMCMode > 0){
     if(!fMCHeader) {
       AliFatal(Form("fMCMode = %d, but MC header not found", fMCMode));
@@ -514,10 +536,6 @@ void AliNanoAODReplicator::ReplicateAndFilter(const AliAODEvent& source)
     }
     fMCParticles->Clear("C");
   }
-  Int_t ntracks(0);
-  Int_t input(0);
-
-  //AliAODVertex *vtx = source.GetPrimaryVertex();
 
   fHeader->SetMapFiredTriggerClasses(fVarListHeader_fTC);
 
@@ -525,44 +543,19 @@ void AliNanoAODReplicator::ReplicateAndFilter(const AliAODEvent& source)
   for (std::list<AliNanoAODCustomSetter*>::iterator it = fCustomSetters.begin(); it != fCustomSetters.end(); ++it)
     (*it)->SetNanoAODHeader(&source, fHeader, fVarListHeader);
 
-  Int_t entries = -1;
-  TClonesArray* particleArray = 0x0;
-
-  if(!fInputArrayName.IsNull()){
-    particleArray = static_cast<TClonesArray*> (source.FindListObject(fInputArrayName.Data()));
-    entries = particleArray->GetEntries();
-  }else{
-    entries = source.GetNumberOfTracks();
-  }
-
-  if(entries<=0) return;
-
-  for(Int_t j=0; j<entries; j++){
-    AliVTrack *track = 0x0;
-    if (particleArray) track = (AliVTrack*)particleArray->At(j);
-    else track = (AliVTrack*)source.GetTrack(j);
-
-    AliAODTrack *aodtrack =(AliAODTrack*)track;// FIXME DYNAMIC CAST?
-    if(fTrackCuts && !fTrackCuts->IsSelected(aodtrack)) continue;
-
-    AliNanoAODTrack* nanoTrack = new((*fTracks)[ntracks++]) AliNanoAODTrack (aodtrack, fVarList);
-
-    for (std::list<AliNanoAODCustomSetter*>::iterator it = fCustomSetters.begin(); it != fCustomSetters.end(); ++it)
-      (*it)->SetNanoAODTrack(aodtrack, nanoTrack);
-  }  
-  //----------------------------------------------------------
-  
-  // TODO make copying of all vertices optional (and keep only vtx_z)
+  // keep here only *primary* vertices
   TIter nextV(source.GetVertices());
   AliAODVertex* v;
   Int_t nvertices(0);
   while ( ( v = static_cast<AliAODVertex*>(nextV()) ) )
   {
+    if (v->GetType()!=AliAODVertex::kPrimary && v->GetType()!=AliAODVertex::kMainSPD && 
+      v->GetType()!=AliAODVertex::kPileupSPD && v->GetType()!=AliAODVertex::kMainTPC && v->GetType()!=AliAODVertex::kPrimaryTPC)
+      continue;
+
     AliAODVertex* tmp = v->CloneWithoutRefs();
     AliAODVertex* copiedVertex = new((*fVertices)[nvertices++]) AliAODVertex(*tmp);
-    
     copiedVertex->SetNContributors(v->GetNContributors()); 
-    
     delete tmp;
   }
   
@@ -581,172 +574,142 @@ void AliNanoAODReplicator::ReplicateAndFilter(const AliAODEvent& source)
       
   }
 
-  if(fSaveV0s){
-    TIter nextV(source.GetV0s());
-    AliAODv0* v;
-    Int_t nvertices = 0;
-    while ( ( v = static_cast<AliAODv0*>(nextV()) ) )
-    {
-      if (fV0Cuts && !fV0Cuts->IsSelected(v))
-        continue;
-      AliAODv0* tmp = (AliAODv0*) v->Clone();
-      new((*fV0s)[nvertices++]) AliAODv0(*tmp);
-      delete tmp;
-    }
-    // Printf("n(tracks) = %d n(V0) = %d -> %d", source.GetNumberOfTracks(), source.GetNumberOfV0s(), nvertices);
-  }
-  
+  // NOTE cascades have to be before V0s as AliAODEvent::FixCascades needs sane V0 information
+  std::map<AliAODVertex*, std::vector<TObject*> > keepTracks;
   if (fSaveCascades) {
     TIter nextC(const_cast<AliAODEvent&>(source).GetCascades());
     AliAODcascade* cascade;
     Int_t n = 0;
     while ( ( cascade = static_cast<AliAODcascade*>(nextC()) ) )
     {
-      if (fCascadeCuts && !fCascadeCuts->IsSelected(v))
+      if (fCascadeCuts && !fCascadeCuts->IsSelected(cascade))
         continue;
-      AliAODcascade* tmp = (AliAODcascade*) cascade->Clone();
-      new((*fCascades)[n++]) AliAODcascade(*tmp);
-      delete tmp;
+
+      // bachelor track and xi vertex
+      AliAODVertex* copiedXi = new((*fVertices)[nvertices++]) AliAODVertex(*(cascade->GetDecayVertexXi()));
+      Int_t nDaughter = copiedXi->GetNDaughters();
+      for (int nD = 0; nD<nDaughter; nD++)
+        keepTracks[copiedXi].push_back(copiedXi->GetDaughter(nD));
+      copiedXi->RemoveDaughters();
+      
+      // v0 vertex and tracks
+      AliAODVertex* copiedV0Vertex = new((*fVertices)[nvertices++]) AliAODVertex(*(cascade->GetSecondaryVtx()));
+      nDaughter = copiedV0Vertex->GetNDaughters();
+      for (int nD = 0; nD<nDaughter; nD++)
+        keepTracks[copiedV0Vertex].push_back(copiedV0Vertex->GetDaughter(nD));
+      copiedV0Vertex->RemoveDaughters();
+      
+      // NOTE we don't have AliAODcascade::SetDecayVertexXi so have to use copy constructor here
+      //AliAODcascade* nanoCascade = new((*fCascades)[n++]) AliAODcascade(*cascade); 
+      //nanoCascade->SetDecayVertexXi(copiedXi);
+      const Double_t momBach[] = { cascade->MomBachX(), cascade->MomBachY(), cascade->MomBachZ() };
+      AliAODcascade* nanoCascade = new((*fCascades)[n++]) AliAODcascade(copiedXi, cascade->ChargeXi(), cascade->DcaXiDaughters(), cascade->DcaXiToPrimVertex(), 
+                                                                        cascade->DcaBachToPrimVertex(), (const Double_t*) momBach, *cascade);
+      nanoCascade->SetSecondaryVtx(copiedV0Vertex);
     }
   }  
+
+  if(fSaveV0s){
+    TIter nextV(source.GetV0s());
+    AliAODv0* v;
+    Int_t nV0s = 0;
+    while ( ( v = static_cast<AliAODv0*>(nextV()) ) )
+    {
+      if (fV0Cuts && !fV0Cuts->IsSelected(v))
+        continue;
+
+      AliAODv0* nanoV0 = new((*fV0s)[nV0s++]) AliAODv0(*v);
+
+      AliAODVertex* copiedVertex = new((*fVertices)[nvertices++]) AliAODVertex(*(v->GetSecondaryVtx()));
+      nanoV0->SetSecondaryVtx(copiedVertex);
+
+      // needed tracks
+      Int_t nDaughter = copiedVertex->GetNDaughters();
+      for (int nD = 0; nD<nDaughter; nD++)
+        keepTracks[copiedVertex].push_back(copiedVertex->GetDaughter(nD));
+      copiedVertex->RemoveDaughters();
+    }
+    // Printf("n(tracks) = %d n(V0) = %d -> %d", source.GetNumberOfTracks(), source.GetNumberOfV0s(), nV0s);
+  }
   
-  AliDebug(1,Form("input mu tracks=%d tracks=%d vertices=%d",
-                  input,fTracks->GetEntries(),fVertices->GetEntries())); 
+  // Tracks
+  Int_t entries = -1;
+  TClonesArray* particleArray = 0x0;
+
+  if(!fInputArrayName.IsNull()){
+    particleArray = static_cast<TClonesArray*> (source.FindListObject(fInputArrayName.Data()));
+    entries = particleArray->GetEntries();
+  }else{
+    entries = source.GetNumberOfTracks();
+  }
+
+  // Photons
+  std::list<Int_t> trackIDs;
+  if (fSaveConversionPhotons) {
+    Int_t nConvPhotons = 0;
+    static AliV0ReaderV1* photonReader = (AliV0ReaderV1*) AliAnalysisManager::GetAnalysisManager()->GetTask("ConvGammaAODProduction");
+    if (!photonReader)
+      AliFatal("No V0 reader but photon conversion requested");
+    if (photonReader->AreAODsRelabeled() != kFALSE)
+      AliFatal("This requires not relabled tracks");
+    TClonesArray* gammaArray = photonReader->GetReconstructedGammas();
+    for (int iGamma = 0; iGamma < gammaArray->GetEntriesFast(); ++iGamma) {
+      auto *photonCandidate = dynamic_cast<AliAODConversionPhoton *>(gammaArray->At(iGamma));
+      if (fConversionPhotonCuts && !fConversionPhotonCuts->IsSelected(photonCandidate))
+        continue;
+      trackIDs.push_back(photonCandidate->GetTrackLabelPositive());
+      trackIDs.push_back(photonCandidate->GetTrackLabelNegative());
+      new((*fConversionPhotons)[nConvPhotons++]) AliAODConversionPhoton(*photonCandidate);
+    }
+  }
   
+  // Tracks
+  Int_t ntracks(0);
+  for(Int_t j=0; j<entries; j++) {
+    AliVTrack *track = 0x0;
+    if (particleArray) track = (AliVTrack*)particleArray->At(j);
+    else track = (AliVTrack*)source.GetTrack(j);
+
+    AliAODTrack *aodtrack = (AliAODTrack*) track;
+
+    Bool_t selected = kFALSE;
+    if (!fTrackCuts || fTrackCuts->IsSelected(aodtrack)) 
+      selected = kTRUE;
+    
+    // store tracks needed for V0s
+    for (std::map<AliAODVertex*, std::vector<TObject*> >::iterator it = keepTracks.begin(); it != keepTracks.end(); it++) {
+      if (std::find(it->second.begin(), it->second.end(), aodtrack) != it->second.end())
+        selected = kTRUE;
+    }
+    
+    // store tracks needed for conversions
+    if (std::find(trackIDs.begin(), trackIDs.end(), aodtrack->GetID()) != trackIDs.end())
+      selected = kTRUE;
+    
+    if (!selected)
+      continue;
+
+    AliNanoAODTrack* nanoTrack = new((*fTracks)[ntracks++]) AliNanoAODTrack (aodtrack, fVarList);
+
+    // replace referencs to stored tracks
+    for (std::map<AliAODVertex*, std::vector<TObject*> >::iterator it = keepTracks.begin(); it != keepTracks.end(); it++) {
+      auto daughterListIt = std::find(it->second.begin(), it->second.end(), aodtrack);
+      if (daughterListIt != it->second.end())
+        it->first->AddDaughter(nanoTrack);
+    }
+
+    for (std::list<AliNanoAODCustomSetter*>::iterator it = fCustomSetters.begin(); it != fCustomSetters.end(); ++it)
+      (*it)->SetNanoAODTrack(aodtrack, nanoTrack);
+  }
+  
+  AliDebug(1,Form("tracks=%d vertices=%d", fTracks->GetEntries(),fVertices->GetEntries())); 
   
   // Finally, deal with MC information, if needed
-  
   if ( fMCMode > 0 ) {
     FilterMC(source);      
   }
-  
-
 }
 
-
-
-//-----------------------------------------------------------------------------
-
-//----------------------------------------------------------------------------
-	
-
-//-----------------------------------------------------------------------------
-
-// AliAODVertex* AliNanoAODReplicator::PrimaryVertex(const TObjArray *trkArray,
-// 						   AliAODEvent &event) const
-// {
-//   // Returns primary vertex to be used for this candidate
-//   //AliCodeTimerAuto("",0);
-
-//   AliESDVertex *vertexESD = 0;
-//   AliAODVertex *vertexAOD = 0;
-
-
-//   if(!fRecoPrimVtxSkippingTrks && !fRmTrksFromPrimVtx) { 
-//     // primary vertex from the input event
-    
-//     vertexESD = new AliESDVertex(*fV1);
-
-//   } else {
-//     // primary vertex specific to this candidate
-
-//     Int_t nTrks = trkArray->GetEntriesFast();
-//     AliVertexerTracks *vertexer = new AliVertexerTracks(event.GetMagneticField());
-
-//     if(fRecoPrimVtxSkippingTrks) { 
-//       // recalculating the vertex
-      
-//       if(strstr(fV1->GetTitle(),"VertexerTracksWithConstraint")) {
-// 	Float_t diamondcovxy[3];
-// 	event.GetDiamondCovXY(diamondcovxy);
-// 	Double_t pos[3]={event.GetDiamondX(),event.GetDiamondY(),0.};
-// 	Double_t cov[6]={diamondcovxy[0],diamondcovxy[1],diamondcovxy[2],0.,0.,10.*10.};
-// 	AliESDVertex *diamond = new AliESDVertex(pos,cov,1.,1);
-// 	vertexer->SetVtxStart(diamond);
-// 	delete diamond; diamond=NULL;
-// 	if(strstr(fV1->GetTitle(),"VertexerTracksWithConstraintOnlyFitter")) 
-// 	  vertexer->SetOnlyFitter();
-//       }
-//       Int_t skipped[1000];
-//       Int_t nTrksToSkip=0,id;
-//       AliExternalTrackParam *t = 0;
-//       for(Int_t i=0; i<nTrks; i++) {
-// 	t = (AliExternalTrackParam*)trkArray->UncheckedAt(i);
-// 	id = (Int_t)t->GetID();
-// 	if(id<0) continue;
-// 	skipped[nTrksToSkip++] = id;
-//       }
-//       // TEMPORARY FIX
-//       // For AOD, skip also tracks without covariance matrix
-//       if(fInputAOD) {
-// 	Double_t covtest[21];
-// 	for(Int_t j=0; j<event.GetNumberOfTracks(); j++) {
-// 	  AliVTrack *vtrack = (AliVTrack*)event.GetTrack(j);
-// 	  if(!vtrack->GetCovarianceXYZPxPyPz(covtest)) {
-// 	    id = (Int_t)vtrack->GetID();
-// 	    if(id<0) continue;
-// 	    skipped[nTrksToSkip++] = id;
-// 	  }
-// 	}
-//       }
-//       for(Int_t ijk=nTrksToSkip; ijk<1000; ijk++) skipped[ijk]=-1;
-//       //
-//       vertexer->SetSkipTracks(nTrksToSkip,skipped);
-//       vertexESD = (AliESDVertex*)vertexer->FindPrimaryVertex(event); 
-      
-//     } else if(fRmTrksFromPrimVtx && nTrks>0) { 
-//       // removing the prongs tracks
-      
-//       TObjArray rmArray(nTrks);
-//       UShort_t *rmId = new UShort_t[nTrks];
-//       AliESDtrack *esdTrack = 0;
-//       AliESDtrack *t = 0;
-//       for(Int_t i=0; i<nTrks; i++) {
-// 	t = (AliESDtrack*)trkArray->UncheckedAt(i);
-// 	esdTrack = new AliESDtrack(*t);
-// 	rmArray.AddLast(esdTrack);
-// 	if(esdTrack->GetID()>=0) {
-// 	  rmId[i]=(UShort_t)esdTrack->GetID();
-// 	} else {
-// 	  rmId[i]=9999;
-// 	}
-//       }
-//       Float_t diamondxy[2]={event.GetDiamondX(),event.GetDiamondY()};
-//       vertexESD = vertexer->RemoveTracksFromVertex(fV1,&rmArray,rmId,diamondxy);
-//       delete [] rmId; rmId=NULL;
-//       rmArray.Delete();
-      
-//     }
-
-//     if(!vertexESD) return vertexAOD;
-//     if(vertexESD->GetNContributors()<=0) { 
-//       //AliDebug(2,"vertexing failed"); 
-//       delete vertexESD; vertexESD=NULL;
-//       return vertexAOD;
-//     }
-
-//     delete vertexer; vertexer=NULL;
-
-//   }
-
-//   // convert to AliAODVertex
-//   Double_t pos[3],cov[6],chi2perNDF;
-//   vertexESD->GetXYZ(pos); // position
-//   vertexESD->GetCovMatrix(cov); //covariance matrix
-//   chi2perNDF = vertexESD->GetChi2toNDF();
-//   delete vertexESD; vertexESD=NULL;
-
-//   vertexAOD = new AliAODVertex(pos,cov,chi2perNDF);
-
-//   return vertexAOD;
-// }
-
-//_____________________________________________________________________________
-
-
-
-// //---------------------------------------------------------------------------
-
-void AliNanoAODReplicator::Terminate(){
-
+void AliNanoAODReplicator::Terminate()
+{
 }

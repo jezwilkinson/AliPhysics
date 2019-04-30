@@ -197,7 +197,11 @@ AliAnalysisTaskUPCforwardMC::AliAnalysisTaskUPCforwardMC()
       fMCCosThetaHelicityFrameJPsiTenRapidityBinsH{ 0, 0, 0, 0, 0, 0, 0, 0, 0, 0},
       fMCCosThetaCollinsSoperFrameJPsiTenRapidityBinsH{ 0, 0, 0, 0, 0, 0, 0, 0, 0, 0},
       fMCPhiHelicityFrameJPsiTenRapidityBinsH{ 0, 0, 0, 0, 0, 0, 0, 0, 0, 0},
-      fMCPhiCollinsSoperFrameJPsiTenRapidityBinsH{ 0, 0, 0, 0, 0, 0, 0, 0, 0, 0}
+      fMCPhiCollinsSoperFrameJPsiTenRapidityBinsH{ 0, 0, 0, 0, 0, 0, 0, 0, 0, 0},
+      fInvariantMassDistributionBinsOfCosThetaAndPhiHelicityFrameH(0),
+      fMCInvariantMassDistributionBinsOfCosThetaAndPhiHelicityFrameH(0),
+      fCosThetaAndPhiHelicityFrameInclusivePeopleBinningH(0),
+      fMCCosThetaAndPhiHelicityFrameInclusivePeopleBinningH(0)
 {
     // default constructor, don't allocate memory here!
     // this is used by root for IO purposes, it needs to remain empty
@@ -320,7 +324,11 @@ AliAnalysisTaskUPCforwardMC::AliAnalysisTaskUPCforwardMC( const char* name )
       fMCCosThetaHelicityFrameJPsiTenRapidityBinsH{ 0, 0, 0, 0, 0, 0, 0, 0, 0, 0},
       fMCCosThetaCollinsSoperFrameJPsiTenRapidityBinsH{ 0, 0, 0, 0, 0, 0, 0, 0, 0, 0},
       fMCPhiHelicityFrameJPsiTenRapidityBinsH{ 0, 0, 0, 0, 0, 0, 0, 0, 0, 0},
-      fMCPhiCollinsSoperFrameJPsiTenRapidityBinsH{ 0, 0, 0, 0, 0, 0, 0, 0, 0, 0}
+      fMCPhiCollinsSoperFrameJPsiTenRapidityBinsH{ 0, 0, 0, 0, 0, 0, 0, 0, 0, 0},
+      fInvariantMassDistributionBinsOfCosThetaAndPhiHelicityFrameH(0),
+      fMCInvariantMassDistributionBinsOfCosThetaAndPhiHelicityFrameH(0),
+      fCosThetaAndPhiHelicityFrameInclusivePeopleBinningH(0),
+      fMCCosThetaAndPhiHelicityFrameInclusivePeopleBinningH(0)
 {
     FillGoodRunVector(fVectorGoodRunNumbers);
 
@@ -764,6 +772,56 @@ void AliAnalysisTaskUPCforwardMC::UserCreateOutputObjects()
               );
     fOutputList->Add(fMCPhiCollinsSoperFrameJPsiTenRapidityBinsH[iRapidityBin]);
   }
+
+  fInvariantMassDistributionBinsOfCosThetaAndPhiHelicityFrameH =
+        new TH2F( "fInvariantMassDistributionBinsOfCosThetaAndPhiHelicityFrameH",
+                  "fInvariantMassDistributionBinsOfCosThetaAndPhiHelicityFrameH",
+                  80, -1, 1,
+                  80, -4, 4
+                  );
+  fOutputList->Add(fInvariantMassDistributionBinsOfCosThetaAndPhiHelicityFrameH);
+
+  fMCInvariantMassDistributionBinsOfCosThetaAndPhiHelicityFrameH =
+        new TH2F( "fMCInvariantMassDistributionBinsOfCosThetaAndPhiHelicityFrameH",
+                  "fMCInvariantMassDistributionBinsOfCosThetaAndPhiHelicityFrameH",
+                  80, -1, 1,
+                  80, -4, 4
+                  );
+  fOutputList->Add(fMCInvariantMassDistributionBinsOfCosThetaAndPhiHelicityFrameH);
+
+  /* - Variable binning for CosTheta and Phi.
+     - Adopting same binning as inclusive people's.
+     -
+   */
+  const Int_t XBINS = 19;
+  const Int_t YBINS = 20;
+  Double_t CosThetaBinning[ XBINS + 1 ] = { -1. , -0.8, -0.7 , -0.6 , -0.5, -0.4,
+                                            -0.3, -0.2, -0.12, -0.04,  0.04, 0.12,
+                                             0.2,  0.3,  0.4,   0.5,   0.6,  0.7,
+                                             0.8,  1
+                                             };
+  Double_t PhiBinning[ YBINS + 1 ] = { -3.142, -2.639, -2.136, -1.885, -1.696,
+                                       -1.571, -1.445, -1.257, -1.005, -0.502,
+                                        0.,     0.502,  1.005,  1.257,  1.445,
+                                        1.571,  1.696,  1.885,  2.136,  2.639,
+                                        3.142
+                                      };
+  fCosThetaAndPhiHelicityFrameInclusivePeopleBinningH =
+        new TH2F( "fCosThetaAndPhiHelicityFrameInclusivePeopleBinningH",
+                  "fCosThetaAndPhiHelicityFrameInclusivePeopleBinningH",
+                  XBINS, CosThetaBinning,
+                  YBINS, PhiBinning
+                  );
+  fOutputList->Add(fCosThetaAndPhiHelicityFrameInclusivePeopleBinningH);
+
+  fMCCosThetaAndPhiHelicityFrameInclusivePeopleBinningH =
+        new TH2F( "fMCCosThetaAndPhiHelicityFrameInclusivePeopleBinningH",
+                  "fMCCosThetaAndPhiHelicityFrameInclusivePeopleBinningH",
+                  XBINS, CosThetaBinning,
+                  YBINS, PhiBinning
+                  );
+  fOutputList->Add(fMCCosThetaAndPhiHelicityFrameInclusivePeopleBinningH);
+
 
   //_______________________________
   // - End of the function
@@ -1261,7 +1319,7 @@ void AliAnalysisTaskUPCforwardMC::UserExec(Option_t *)
        -
        */
     for(Int_t iRapidityBin = 0; iRapidityBin < 8; iRapidityBin++){
-        if( (possibleJPsiCopy.Rapidity() + 4) < 1.5*(iRapidityBin + 1)/8 ){
+        if( (possibleJPsiCopy.Rapidity() + 4.) < 1.5*((Double_t)iRapidityBin + 1.)/8. ){
           fThetaDistribOfPositiveMuonRestFrameJPsiRapidityBinH[iRapidityBin]->Fill(cosThetaMuonsRestFrame[0]);
           /* - New part: filling all possible histograms!
              -
@@ -1302,7 +1360,7 @@ void AliAnalysisTaskUPCforwardMC::UserExec(Option_t *)
        - NEW: the following code is for 10 rapidity bins...
        */
     for(Int_t iRapidityBin = 0; iRapidityBin < 10; iRapidityBin++){
-        if( (possibleJPsiCopy.Rapidity() + 4) < 1.5*(iRapidityBin + 1)/10 ){
+        if( (possibleJPsiCopy.Rapidity() + 4.) < 1.5*((Double_t)iRapidityBin + 1.)/10. ){
           fCosThetaHelicityFrameJPsiTenRapidityBinsH[iRapidityBin]->Fill( CosThetaHelicityFrame( muonsCopy2[0],
                                                                                                  muonsCopy2[1],
                                                                                                  possibleJPsiCopy
@@ -1326,6 +1384,36 @@ void AliAnalysisTaskUPCforwardMC::UserExec(Option_t *)
           break;
         }
     }
+
+
+    /* - What we do here is very similar.
+       - This time we divide firstly in bins of CosTheta.
+       - As many as needed.
+       - And then we divide again in terms of Phi.
+       - Then we fill.
+       - This way we should be able to obtain some kind of map...
+       -
+     */
+    fInvariantMassDistributionBinsOfCosThetaAndPhiHelicityFrameH->Fill( CosThetaHelicityFrame( muonsCopy2[0],
+                                                                                               muonsCopy2[1],
+                                                                                               possibleJPsiCopy
+                                                                                               ),
+                                                                        CosPhiHelicityFrame( muonsCopy2[0],
+                                                                                             muonsCopy2[1],
+                                                                                             possibleJPsiCopy
+                                                                                             )
+                                                                        );
+    fCosThetaAndPhiHelicityFrameInclusivePeopleBinningH->Fill( CosThetaHelicityFrame( muonsCopy2[0],
+                                                                                      muonsCopy2[1],
+                                                                                      possibleJPsiCopy
+                                                                                      ),
+                                                               CosPhiHelicityFrame( muonsCopy2[0],
+                                                                                    muonsCopy2[1],
+                                                                                    possibleJPsiCopy
+                                                                                    )
+                                                               );
+
+
   }
 
   // fVectorCosThetaReconstructed.push_back(cosThetaMuonsRestFrame[0]);
@@ -1523,7 +1611,7 @@ void AliAnalysisTaskUPCforwardMC::ProcessMCParticles(AliMCEvent* fMCEventArg)
                      -
                      */
                   for(Int_t iRapidityBin = 0; iRapidityBin < 8; iRapidityBin++){
-                      if( (possibleJPsiMC.Rapidity() + 4) < 1.5*(iRapidityBin + 1)/8 ){
+                      if( (possibleJPsiMC.Rapidity() + 4.) < 1.5*((Double_t)iRapidityBin + 1.)/8. ){
                         fMCthetaDistribOfPositiveMuonRestFrameJPsiGeneratedTruthRapidityBinH[iRapidityBin]->Fill(cosThetaMuonsRestFrameMC[0]);
                         /* - New part: filling all possible histograms!
                            -
@@ -1556,7 +1644,7 @@ void AliAnalysisTaskUPCforwardMC::ProcessMCParticles(AliMCEvent* fMCEventArg)
                      -
                    */
                   for(Int_t iRapidityBin = 0; iRapidityBin < 10; iRapidityBin++){
-                      if( (possibleJPsiMC.Rapidity() + 4) < 1.5*(iRapidityBin + 1)/10 ){
+                      if( (possibleJPsiMC.Rapidity() + 4.) < 1.5*((Double_t)iRapidityBin + 1.)/10. ){
                         fMCCosThetaHelicityFrameJPsiTenRapidityBinsH[iRapidityBin]->Fill( CosThetaHelicityFrame( muonsMCcopy[0],
                                                                                                                  muonsMCcopy[1],
                                                                                                                  possibleJPsiMC
@@ -1580,6 +1668,32 @@ void AliAnalysisTaskUPCforwardMC::ProcessMCParticles(AliMCEvent* fMCEventArg)
                         break;
                       }
                   }
+                  /* - What we do here is very similar.
+                     - This time we divide firstly in bins of CosTheta.
+                     - As many as needed.
+                     - And then we divide again in terms of Phi.
+                     - Then we fill.
+                     - This way we should be able to obtain some kind of map...
+                     -
+                   */
+                  fMCInvariantMassDistributionBinsOfCosThetaAndPhiHelicityFrameH->Fill( CosThetaHelicityFrame( muonsMCcopy[0],
+                                                                                                               muonsMCcopy[1],
+                                                                                                               possibleJPsiMC
+                                                                                                               ),
+                                                                                        CosPhiHelicityFrame( muonsMCcopy[0],
+                                                                                                             muonsMCcopy[1],
+                                                                                                             possibleJPsiMC
+                                                                                                             )
+                                                                                        );
+                  fMCCosThetaAndPhiHelicityFrameInclusivePeopleBinningH->Fill( CosThetaHelicityFrame( muonsMCcopy[0],
+                                                                                                      muonsMCcopy[1],
+                                                                                                      possibleJPsiMC
+                                                                                                      ),
+                                                                               CosPhiHelicityFrame( muonsMCcopy[0],
+                                                                                                    muonsMCcopy[1],
+                                                                                                    possibleJPsiMC
+                                                                                                    )
+                                                                               );
           } else  {
                   fMCthetaDistribOfNegativeMuonRestFrameJPsiGeneratedTruthH->Fill(cosThetaMuonsRestFrameMC[0]);
                   fMCthetaDistribOfPositiveMuonRestFrameJPsiGeneratedTruthH->Fill(cosThetaMuonsRestFrameMC[1]);
@@ -1617,7 +1731,7 @@ void AliAnalysisTaskUPCforwardMC::ProcessMCParticles(AliMCEvent* fMCEventArg)
                      -
                      */
                   for(Int_t iRapidityBin = 0; iRapidityBin < 8; iRapidityBin++){
-                      if( (possibleJPsiMC.Rapidity() + 4) < 1.5*(iRapidityBin + 1)/8 ){
+                      if( (possibleJPsiMC.Rapidity() + 4.) < 1.5*((Double_t)iRapidityBin + 1.)/8. ){
                         fMCthetaDistribOfPositiveMuonRestFrameJPsiGeneratedTruthRapidityBinH[iRapidityBin]->Fill(cosThetaMuonsRestFrameMC[1]);
                         /* - New part: filling all possible histograms!
                            -
@@ -1650,7 +1764,7 @@ void AliAnalysisTaskUPCforwardMC::ProcessMCParticles(AliMCEvent* fMCEventArg)
                      -
                    */
                   for(Int_t iRapidityBin = 0; iRapidityBin < 10; iRapidityBin++){
-                      if( (possibleJPsiMC.Rapidity() + 4) < 1.5*(iRapidityBin + 1)/10 ){
+                      if( (possibleJPsiMC.Rapidity() + 4.) < 1.5*((Double_t)iRapidityBin + 1.)/10. ){
                         fMCCosThetaHelicityFrameJPsiTenRapidityBinsH[iRapidityBin]->Fill( CosThetaHelicityFrame( muonsMCcopy[1],
                                                                                                                  muonsMCcopy[0],
                                                                                                                  possibleJPsiMC
@@ -1674,7 +1788,32 @@ void AliAnalysisTaskUPCforwardMC::ProcessMCParticles(AliMCEvent* fMCEventArg)
                         break;
                       }
                   }
-
+                  /* - What we do here is very similar.
+                     - This time we divide firstly in bins of CosTheta.
+                     - As many as needed.
+                     - And then we divide again in terms of Phi.
+                     - Then we fill.
+                     - This way we should be able to obtain some kind of map...
+                     -
+                   */
+                  fMCInvariantMassDistributionBinsOfCosThetaAndPhiHelicityFrameH->Fill( CosThetaHelicityFrame( muonsMCcopy[1],
+                                                                                                               muonsMCcopy[0],
+                                                                                                               possibleJPsiMC
+                                                                                                               ),
+                                                                                        CosPhiHelicityFrame( muonsMCcopy[1],
+                                                                                                             muonsMCcopy[0],
+                                                                                                             possibleJPsiMC
+                                                                                                             )
+                                                                                        );
+                  fMCCosThetaAndPhiHelicityFrameInclusivePeopleBinningH->Fill( CosThetaHelicityFrame( muonsMCcopy[1],
+                                                                                                      muonsMCcopy[0],
+                                                                                                      possibleJPsiMC
+                                                                                                      ),
+                                                                               CosPhiHelicityFrame( muonsMCcopy[1],
+                                                                                                    muonsMCcopy[0],
+                                                                                                    possibleJPsiMC
+                                                                                                    )
+                                                                               );
           }
       }
     }

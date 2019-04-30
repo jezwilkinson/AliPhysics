@@ -18,6 +18,7 @@ class AliAODTrack;
 class AliHFEcollection;
 class TArrayD;
 class AliAODVertex;
+class TRandom3;
 
 
 
@@ -81,6 +82,10 @@ class AliAnalysisTaskHFEIPCorrection : public AliAnalysisTaskSE {
   TH2D * fpTIP3050OOP;
   TH3D * fPionV0pTRNoCuts;
   TH3D * fPionV0pTRWithCuts;
+  TH3D * fPionV0pTRNoCutsIP;
+  TH3D * fPionV0pTRWithCutsIP;
+  TH3D * fPionV0pTRNoCutsOOP;
+  TH3D * fPionV0pTRWithCutsOOP;
   TH2D * fPionV0pTTPC;
   TH2D * fPionV0pTTPCWithCuts;
 
@@ -100,6 +105,7 @@ class AliAnalysisTaskHFEIPCorrection : public AliAnalysisTaskSE {
   TH3D * fDCAPhipTKaonsC;
   TH3D * fpTPhiZHadrons;
   TH3D * fDCAWErrHadrons;
+  TH2D * fDCAHadrons;
   TH3D * fDCAHadronsFineBins;
   TH2D * fDCAKaons; // Should have less contamination, but have higher mass
   TH3D * fDCAWErrKaons;
@@ -108,7 +114,7 @@ class AliAnalysisTaskHFEIPCorrection : public AliAnalysisTaskSE {
   //AliHFEcuts * hfetrackCuts;           // Track cuts
   AliHFEextraCuts * fExtraCuts;
   AliAODv0KineCuts * fAODV0Cuts;
-  
+  TRandom3 * fRd;
   
   ClassDef(AliAnalysisTaskHFEIPCorrection, 1); // example of analysis
 };

@@ -531,30 +531,28 @@ TString AliVertexingHFUtils::GetGenerator(Int_t label, AliAODMCHeader* header){
 }
 //_____________________________________________________________________
 void AliVertexingHFUtils::GetTrackPrimaryGenerator(AliAODTrack *track,AliAODMCHeader *header,TClonesArray *arrayMC,TString &nameGen){
+  GetTrackPrimaryGenerator(track->GetLabel(),header,arrayMC,nameGen);
+}
+//_____________________________________________________________________
+void AliVertexingHFUtils::GetTrackPrimaryGenerator(Int_t label, AliAODMCHeader *header,TClonesArray *arrayMC,TString &nameGen){
 
   /// method to check if a track comes from a given generator
 
-  Int_t lab=TMath::Abs(track->GetLabel());
+  Int_t lab=TMath::Abs(label);
   nameGen=GetGenerator(lab,header);
 
   //  Int_t countControl=0;
 
   while(nameGen.IsWhitespace()){
     AliAODMCParticle *mcpart= (AliAODMCParticle*)arrayMC->At(lab);
-    if(!mcpart){
-      printf("AliVertexingHFUtils::IsTrackInjected - BREAK: No valid AliAODMCParticle at label %i\n",lab);
-      break;
-    }
+    if(!mcpart) break;
     Int_t mother = mcpart->GetMother();
-    if(mother<0){
-      printf("AliVertexingHFUtils::IsTrackInjected - BREAK: Reached primary particle without valid mother\n");
-      break;
-    }
+    if(mother<0) break;
     lab=mother;
     nameGen=GetGenerator(mother,header);
     // countControl++;
     // if(countControl>=10){ // 10 = arbitrary number; protection from infinite loops
-    //   printf("AliVertexingHFUtils::IsTrackInjected - BREAK: Protection from infinite loop active\n");
+    //   printf("AliVertexingHFUtils::GetTrackPrimaryGenerator - BREAK: Protection from infinite loop active\n");
     //   break;
     // }
   }
@@ -564,8 +562,16 @@ void AliVertexingHFUtils::GetTrackPrimaryGenerator(AliAODTrack *track,AliAODMCHe
 //----------------------------------------------------------------------
 Bool_t AliVertexingHFUtils::IsTrackInjected(AliAODTrack *track,AliAODMCHeader *header,TClonesArray *arrayMC){
   /// method to check if a track comes from the signal event or from the underlying Hijing event
+
+  return IsTrackInjected(track->GetLabel(),header,arrayMC);
+}
+//----------------------------------------------------------------------
+Bool_t AliVertexingHFUtils::IsTrackInjected(Int_t label, AliAODMCHeader *header,TClonesArray *arrayMC){
+  /// method to check if a track comes from the signal event or from the underlying Hijing event
   TString nameGen;
-  GetTrackPrimaryGenerator(track,header,arrayMC,nameGen);
+  Int_t lab=TMath::Abs(label);
+
+  GetTrackPrimaryGenerator(lab,header,arrayMC,nameGen);
 
   if(nameGen.IsWhitespace() || nameGen.Contains("ijing")) return kFALSE;
 
@@ -574,10 +580,23 @@ Bool_t AliVertexingHFUtils::IsTrackInjected(AliAODTrack *track,AliAODMCHeader *h
 //____________________________________________________________________________
 Bool_t AliVertexingHFUtils::IsCandidateInjected(AliAODRecoDecayHF *cand, AliAODMCHeader *header,TClonesArray *arrayMC){
   /// method to check if a D meson candidate comes from the signal event or from the underlying Hijing event
-
+  /// works only for refilled candidates!
   Int_t nprongs=cand->GetNProngs();
   for(Int_t i=0;i<nprongs;i++){
     AliAODTrack *daugh=(AliAODTrack*)cand->GetDaughter(i);
+    if(IsTrackInjected(daugh,header,arrayMC)) return kTRUE;
+  }
+  return kFALSE;
+}
+//____________________________________________________________________________
+Bool_t AliVertexingHFUtils::IsCandidateInjected(AliAODRecoDecayHF *cand, AliAODEvent* aod, AliAODMCHeader *header,TClonesArray *arrayMC){
+  /// method to check if a D meson candidate comes from the signal event or from the underlying Hijing event
+  /// works also with not-refilled candidates of reduced AODs
+
+  Int_t nprongs=cand->GetNProngs();
+  for(Int_t i=0;i<nprongs;i++){
+    Int_t idDau=cand->GetProngID(i);
+    AliAODTrack *daugh=(AliAODTrack*)aod->GetTrack(idDau);
     if(IsTrackInjected(daugh,header,arrayMC)) return kTRUE;
   }
   return kFALSE;
@@ -588,7 +607,7 @@ Bool_t AliVertexingHFUtils::HasCascadeCandidateAnyDaughInjected(AliAODRecoCascad
 
   AliAODTrack* bach = cand->GetBachelor();
   if(IsTrackInjected(bach, header, arrayMC)) {
-    AliDebug(2, "Bachelor is injected, the whole candidate is then injected");
+    //    printf("Bachelor is injected, the whole candidate is then injected\n");
     return kTRUE;
   }
   AliAODv0* v0 = cand->Getv0();
@@ -596,7 +615,7 @@ Bool_t AliVertexingHFUtils::HasCascadeCandidateAnyDaughInjected(AliAODRecoCascad
   for(Int_t i = 0; i < nprongs; i++){
     AliAODTrack *daugh = (AliAODTrack*)v0->GetDaughter(i);
     if(IsTrackInjected(daugh,header,arrayMC)) {
-      AliDebug(2, Form("V0 daughter number %d is injected, the whole candidate is then injected", i));
+      //      printf("V0 daughter number %d is injected, the whole candidate is then injected\n", i);
       return kTRUE;
     }
   }
@@ -613,7 +632,7 @@ Int_t AliVertexingHFUtils::CheckOrigin(AliMCEvent* mcEvent, AliMCParticle *mcPar
   Int_t abspdgGranma =0;
   Bool_t isFromB=kFALSE;
   Bool_t isQuarkFound=kFALSE;
-  while (mother >0 ){
+  while (mother >=0 ){
     istep++;
     AliMCParticle* mcGranma = (AliMCParticle*)mcEvent->GetTrack(mother);
     if (mcGranma){
@@ -646,7 +665,7 @@ Int_t AliVertexingHFUtils::CheckOrigin(TClonesArray* arrayMC, AliAODMCParticle *
   Int_t abspdgGranma =0;
   Bool_t isFromB=kFALSE;
   Bool_t isQuarkFound=kFALSE;
-  while (mother >0 ){
+  while (mother >=0 ){
     istep++;
     AliAODMCParticle* mcGranma = dynamic_cast<AliAODMCParticle*>(arrayMC->At(mother));
     if (mcGranma){
@@ -668,6 +687,70 @@ Int_t AliVertexingHFUtils::CheckOrigin(TClonesArray* arrayMC, AliAODMCParticle *
 
 }
 //____________________________________________________________________________
+Bool_t AliVertexingHFUtils::IsTrackFromCharm(AliAODTrack* tr, TClonesArray* arrayMC){
+  /// check if an AOD track originated from a charm hadron decay
+  Int_t absLabel=TMath::Abs(tr->GetLabel());
+  AliAODMCParticle* mcPart=dynamic_cast<AliAODMCParticle*>(arrayMC->At(absLabel));
+  Int_t mother = mcPart->GetMother();
+  Int_t istep = 0;
+  while (mother >=0 ){
+    istep++;
+    AliAODMCParticle* mcGranma = dynamic_cast<AliAODMCParticle*>(arrayMC->At(mother));
+    if (mcGranma){
+      Int_t abspdgGranma = TMath::Abs(mcGranma->GetPdgCode());
+      if ((abspdgGranma==4) ||(abspdgGranma>400 && abspdgGranma<500) || (abspdgGranma>4000 && abspdgGranma<5000)) return kTRUE;
+      mother = mcGranma->GetMother();
+    }else{
+      printf("AliVertexingHFUtils::IsTrackFromCharm: Failed casting the mother particle!");
+      break;
+    }
+  }
+  return kFALSE;
+}
+//____________________________________________________________________________
+Bool_t AliVertexingHFUtils::IsTrackFromBeauty(AliAODTrack* tr, TClonesArray* arrayMC){
+  /// check if an AOD track originated from a charm hadron decay
+  Int_t absLabel=TMath::Abs(tr->GetLabel());
+  AliAODMCParticle* mcPart=dynamic_cast<AliAODMCParticle*>(arrayMC->At(absLabel));
+  Int_t mother = mcPart->GetMother();
+  Int_t istep = 0;
+  while (mother >=0 ){
+    istep++;
+    AliAODMCParticle* mcGranma = dynamic_cast<AliAODMCParticle*>(arrayMC->At(mother));
+    if (mcGranma){
+      Int_t abspdgGranma = TMath::Abs(mcGranma->GetPdgCode());
+      if ((abspdgGranma==5) ||(abspdgGranma>500 && abspdgGranma<600) || (abspdgGranma>5000 && abspdgGranma<6000)) return kTRUE;
+      mother = mcGranma->GetMother();
+    }else{
+      printf("AliVertexingHFUtils::IsTrackFromBeauty: Failed casting the mother particle!");
+      break;
+    }
+  }
+  return kFALSE;
+}
+//____________________________________________________________________________
+Bool_t AliVertexingHFUtils::IsTrackFromHadronDecay(Int_t pdgMoth, AliAODTrack* tr, TClonesArray* arrayMC){
+  /// check if an AOD track originated from a charm hadron decay
+  Int_t absLabel=TMath::Abs(tr->GetLabel());
+  Int_t absPdgMoth=TMath::Abs(pdgMoth);
+  AliAODMCParticle* mcPart=dynamic_cast<AliAODMCParticle*>(arrayMC->At(absLabel));
+  Int_t mother = mcPart->GetMother();
+  Int_t istep = 0;
+  while (mother >=0 ){
+    istep++;
+    AliAODMCParticle* mcGranma = dynamic_cast<AliAODMCParticle*>(arrayMC->At(mother));
+    if (mcGranma){
+      Int_t abspdgGranma = TMath::Abs(mcGranma->GetPdgCode());
+      if (abspdgGranma==absPdgMoth) return kTRUE;
+      mother = mcGranma->GetMother();
+    }else{
+      printf("AliVertexingHFUtils::IsTrackFromHadronDecay: Failed casting the mother particle!");
+      break;
+    }
+  }
+  return kFALSE;
+}
+//____________________________________________________________________________
 Double_t AliVertexingHFUtils::GetBeautyMotherPt(TClonesArray* arrayMC, AliAODMCParticle *mcPart){
   /// get the pt of the beauty hadron (feed-down case), returns negative value for prompt
 
@@ -676,7 +759,7 @@ Double_t AliVertexingHFUtils::GetBeautyMotherPt(TClonesArray* arrayMC, AliAODMCP
   mother = mcPart->GetMother();
   Int_t istep = 0;
   Int_t abspdgGranma =0;
-  while (mother >0 ){
+  while (mother >=0 ){
     istep++;
     AliAODMCParticle* mcGranma = dynamic_cast<AliAODMCParticle*>(arrayMC->At(mother));
     if (mcGranma){

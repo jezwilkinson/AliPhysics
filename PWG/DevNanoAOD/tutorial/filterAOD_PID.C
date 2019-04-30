@@ -17,12 +17,8 @@ void filterAOD_PID()
   task->AddSetter(new AliNanoAODSimpleSetter);
   
   // Event selection
-  // filter bit
-  task->SelectCollisionCandidates(AliVEvent::kINT7);
-  
   AliAnalysisNanoAODEventCuts* evtCuts = new AliAnalysisNanoAODEventCuts;
-  evtCuts->SetVertexRange(8);
-  evtCuts->SetCutPileUpMV(kTRUE);
+  // NOTE filter bit set in AliEventCuts automatically
 
   // Track selection
   AliAnalysisNanoAODTrackCuts* trkCuts = new AliAnalysisNanoAODTrackCuts;
@@ -33,12 +29,18 @@ void filterAOD_PID()
   // Fields to store
   // event level
   // vertices kept by default
-  task->SetVarListHeader("OfflineTrigger,MagField");
+  task->SetVarListHeader("OfflineTrigger,MagField,T0Spread,NumberOfESDTracks");
   // track level
-  task->SetVarListTrack("pt,theta,phi,cstNSigmaTPCPi,cstNSigmaTPCKa,cstNSigmaTPCPr,cstNSigmaTOFPi,cstNSigmaTOFKa,cstNSigmaTOFPr");
+  task->SetVarListTrack("pt,theta,phi");
+  task->AddPIDField(AliNanoAODTrack::kSigmaTPC, AliPID::kPion);
+  task->AddPIDField(AliNanoAODTrack::kSigmaTPC, AliPID::kKaon);
+  task->AddPIDField(AliNanoAODTrack::kSigmaTPC, AliPID::kProton);
+  task->AddPIDField(AliNanoAODTrack::kSigmaTOF, AliPID::kPion);
+  task->AddPIDField(AliNanoAODTrack::kSigmaTOF, AliPID::kKaon);
+  task->AddPIDField(AliNanoAODTrack::kSigmaTOF, AliPID::kProton);
 
   task->SetTrkCuts(trkCuts);
-  task->SetEvtCuts(evtCuts);
+  task->AddEvtCuts(evtCuts);
 
   mgr->SetDebugLevel(1); // enable debug printouts
   if (!mgr->InitAnalysis()) 

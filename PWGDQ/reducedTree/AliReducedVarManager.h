@@ -24,6 +24,7 @@ class AliReducedEventPlaneInfo;
 class AliReducedBaseTrack;
 class AliReducedTrackInfo;
 class AliReducedCaloClusterInfo;
+class AliReducedCaloClusterTrackMatcher;
 class AliKFParticle;
 
 //_____________________________________________________________________
@@ -606,6 +607,12 @@ class AliReducedVarManager : public TObject {
     kEMCALmatchedEOverP,
     kEMCALmatchedM02,
     kEMCALmatchedM20,
+    kEMCALmatchedNCells,
+    kEMCALmatchedNMatchedTracks,
+    kEMCALmatchedDeltaPhi,
+    kEMCALmatchedDeltaEta,
+    kEMCALmatchedDistance,
+    kNTrackVars,            // variable to mark end of track vars, introduce new tracks vars before this one
     // Calorimeter cluster variables --------------------------------------
     kEMCALclusterEnergy,        
     kEMCALclusterDx,            
@@ -614,6 +621,9 @@ class AliReducedVarManager : public TObject {
     kEMCALm20,
     kEMCALm02,
     kEMCALdispersion,
+    kEMCALnCells,
+    kEMCALnMatchedTracks,
+    kNEMCALvars,            // variable to mark end of EMCal vars, introduce new EMCal vars before this one
     // Track flags -----------------------------------------------------
     kTrackingFlag,
     kTrackQualityFlag,
@@ -698,6 +708,7 @@ class AliReducedVarManager : public TObject {
   static void FillTrackMCFlag(AliReducedBaseTrack* track, UShort_t flag, Float_t* values, UShort_t flag2=999);
   static void FillPairQualityFlag(AliReducedPairInfo* p, UShort_t flag, Float_t* values, UShort_t flag2=999);
   static void FillTrackInfo(AliReducedBaseTrack* p, Float_t* values);
+  static void FillClusterMatchedTrackInfo(AliReducedBaseTrack* p, Float_t* values, TList* clusterList=0x0, AliReducedCaloClusterTrackMatcher* matcher=0x0);
   static void FillITSlayerFlag(AliReducedTrackInfo* track, Int_t layer, Float_t* values);
   static void FillITSsharedLayerFlag(AliReducedTrackInfo* track, Int_t layer, Float_t* values);
   static void FillTPCclusterBitFlag(AliReducedTrackInfo* track, Int_t bit, Float_t* values);
@@ -807,7 +818,7 @@ class AliReducedVarManager : public TObject {
   AliReducedVarManager(AliReducedVarManager const&);
   AliReducedVarManager& operator=(AliReducedVarManager const&);  
   
-  ClassDef(AliReducedVarManager, 8);
+  ClassDef(AliReducedVarManager, 11);
 };
 
 #endif

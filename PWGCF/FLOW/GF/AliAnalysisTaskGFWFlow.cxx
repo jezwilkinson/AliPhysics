@@ -48,6 +48,10 @@ AliAnalysisTaskGFWFlow::AliAnalysisTaskGFWFlow():
   fMCEvent(0),
   fIsMC(kFALSE),
   fPtAxis(0),
+  fPOIpTMin(0.2),
+  fPOIpTMax(20),
+  fRFpTMin(0.2),
+  fRFpTMax(3.0),
   fWeightPath(""),
   fWeightDir(""),
   fTotFlags(15), //Total number of flags: 1 (nominal) + fTotTrackFlags + N_Event flags
@@ -70,6 +74,10 @@ AliAnalysisTaskGFWFlow::AliAnalysisTaskGFWFlow(const char *name, Bool_t ProduceW
   fOutputTree(0),
   fIsMC(IsMC),
   fPtAxis(new TAxis()),
+  fPOIpTMin(0.2),
+  fPOIpTMax(20),
+  fRFpTMin(0.2),
+  fRFpTMax(3.0),
   fWeightPath(""),
   fWeightDir(""),
   fTotFlags(15),
@@ -79,7 +87,7 @@ AliAnalysisTaskGFWFlow::AliAnalysisTaskGFWFlow(const char *name, Bool_t ProduceW
   fAddQA(kFALSE),
   fQAList(0)
 {
-  if(!fProduceWeights) DefineInput(1,TList::Class()); 
+  if(!fProduceWeights) DefineInput(1,TList::Class());
   DefineOutput(1,(fProduceWeights?TList::Class():AliGFWFlowContainer::Class()));
   if(fAddQA)
     DefineOutput(2,TList::Class());
@@ -106,7 +114,7 @@ void AliAnalysisTaskGFWFlow::UserCreateOutputObjects(){
       fWeights = (AliGFWWeights*)fWeightList->Last();
       fWeights->SetName(Form("weights%s",fSelections[i]->GetSystPF()));
       fWeights->Init(!fIsMC,fIsMC); // AddData = !fIsMC; AddMC = fIsMC
-    } 
+    }
   } else {
     //Setup the structure of FC:
     TObjArray *OAforPt=new TObjArray();
@@ -259,24 +267,24 @@ void AliAnalysisTaskGFWFlow::UserCreateOutputObjects(){
 
 
     //Multi bins:
-    Double_t multibins[] = {0,5,10,15,20,30,40,50,70};
+    Double_t multibins[] = {0,10,20,30,40,50,60,70,80};
     fFC = new AliGFWFlowContainer();
     fFC->SetName(Form("FC%s",fSelections[fCurrSystFlag]->GetSystPF()));
     fFC->Initialize(OAforPt,8,multibins,fCurrSystFlag?1:10); //Statistics only required for nominal profiles, so do not create randomized profiles for systematics
     fGFW = new AliGFW();
     //Full regions
     fGFW->AddRegion("poiMid",10,10,-0.8,0.8,1+fPtAxis->GetNbins(),1);
-    fGFW->AddRegion("refMid",10,10,-0.8,0.8,1,1);
+    fGFW->AddRegion("refMid",10,10,-0.8,0.8,1,2);
     //2 subevets:
     fGFW->AddRegion("poiSENeg",10,10,-0.8,0.,1+fPtAxis->GetNbins(),1);
-    fGFW->AddRegion("refSENeg",10,10,-0.8,0.,1,1);
+    fGFW->AddRegion("refSENeg",10,10,-0.8,0.,1,2);
     fGFW->AddRegion("poiSEPos",10,10,0.,0.8,1+fPtAxis->GetNbins(),1);
-    fGFW->AddRegion("refSEPos",10,10,0.,0.8,1,1);
+    fGFW->AddRegion("refSEPos",10,10,0.,0.8,1,2);
     //With gap
     fGFW->AddRegion("poiGapNeg",10,10,-0.8,-0.5,1+fPtAxis->GetNbins(),1);
-    fGFW->AddRegion("refGapNeg",10,10,-0.8,-0.5,1,1);
+    fGFW->AddRegion("refGapNeg",10,10,-0.8,-0.5,1,2);
     fGFW->AddRegion("poiGapPos",10,10,0.5,0.8,1+fPtAxis->GetNbins(),1);
-    fGFW->AddRegion("refGapPos",10,10,0.5,0.8,1,1);
+    fGFW->AddRegion("refGapPos",10,10,0.5,0.8,1,2);
 
 
   };
@@ -310,7 +318,7 @@ void AliAnalysisTaskGFWFlow::UserExec(Option_t*) {
   if(fCurrSystFlag==fTotTrackFlags+4) cent = lMultSel->GetMultiplicityPercentile("CL1"); //CL1 flag is EvFlag 4 = N_TrackFlags + 4
   if(fCurrSystFlag==fTotTrackFlags+5) cent = lMultSel->GetMultiplicityPercentile("CL0"); //CL0 flag is EvFlag 5 = N_TrackFlags + 5
   Double_t vz = fAOD->GetPrimaryVertex()->GetZ();
-  Double_t vtxb = GetVtxBit(fAOD);
+  Int_t vtxb = GetVtxBit(fAOD);
   if(!vtxb) return; //If no vertex pass, then do not consider further
   //fFlowEvent->SetRunNumber(fAOD->GetRunNumber());
   const AliAODVertex* vtx = dynamic_cast<const AliAODVertex*>(fAOD->GetPrimaryVertex());
@@ -321,19 +329,19 @@ void AliAnalysisTaskGFWFlow::UserExec(Option_t*) {
     if(fIsMC) {
       tca = (TClonesArray*)fInputEvent->FindListObject("mcparticles");
       for(Int_t i=0;i<tca->GetEntries();i++) {
-	AliVParticle *lPart;
-	lPart = (AliAODMCParticle*)tca->At(i);
-	if(!AcceptParticle(lPart)) continue;
-	Int_t partbit = GetParticleBit(lPart);
-	if(!partbit) continue; //if no particle bit is set, no need to continue
-	Int_t combinedbit = CombineBits(vtxb,partbit);
-	Int_t count=0;
-	for(Int_t i=0;i<fTotFlags;++i) 
-	  if(fSelections[i]->NeedsExtraWeight()) {
-	    if(combinedbit&(1<<i))
-	      ((AliGFWWeights*)fWeightList->At(count))->Fill(lPart->Phi(),lPart->Eta(),vz,lPart->Pt(),cent,2);
-	    count++;
-	  };
+      	AliVParticle *lPart;
+      	lPart = (AliAODMCParticle*)tca->At(i);
+      	if(!AcceptParticle(lPart)) continue;
+      	Int_t partbit = GetParticleBit(lPart);
+      	if(!partbit) continue; //if no particle bit is set, no need to continue
+      	Int_t combinedbit = CombineBits(vtxb,partbit);
+      	Int_t count=0;
+      	for(Int_t i=0;i<fTotFlags;++i)
+      	  if(fSelections[i]->NeedsExtraWeight()) {
+      	    if(combinedbit&(1<<i))
+      	      ((AliGFWWeights*)fWeightList->At(count))->Fill(lPart->Phi(),lPart->Eta(),vz,lPart->Pt(),cent,2);
+      	    count++;
+      	  };
       };
     };
     AliAODTrack *lTrack;
@@ -349,24 +357,23 @@ void AliAnalysisTaskGFWFlow::UserExec(Option_t*) {
       if(!trackbit) continue; //if no track bit is set, no need to continue
       Int_t combinedbit = CombineBits(vtxb,trackbit);
       if(fIsMC) {
-	AliVParticle *lPart = (AliAODMCParticle*)tca->At(TMath::Abs(lTrack->GetLabel()));
-	Int_t count=0;
-	for(Int_t i=0;i<fTotFlags;++i) 
-	  if(fSelections[i]->NeedsExtraWeight()) {
-	    if(combinedbit&(1<<i))
-	      ((AliGFWWeights*)fWeightList->At(count))->Fill(lPart->Phi(),lPart->Eta(),vz,lPart->Pt(),cent,1);
-	    count++;
-	  };
-      } else {
-	Int_t count=0;
-	for(Int_t i=0;i<fTotFlags;++i) 
-	  if(fSelections[i]->NeedsExtraWeight()) {
-	    if((combinedbit&(1<<i)))
-	      ((AliGFWWeights*)fWeightList->At(count))->Fill(lTrack->Phi(),lTrack->Eta(),vz,lTrack->Pt(),cent,0);
-	    count++;
-	  };	  
-	
-      };
+        AliVParticle *lPart = (AliAODMCParticle*)tca->At(TMath::Abs(lTrack->GetLabel()));
+        Int_t count=0;
+        for(Int_t i=0;i<fTotFlags;++i)
+          if(fSelections[i]->NeedsExtraWeight()) {
+            if(combinedbit&(1<<i))
+              ((AliGFWWeights*)fWeightList->At(count))->Fill(lPart->Phi(),lPart->Eta(),vz,lPart->Pt(),cent,1);
+            count++;
+          };
+        } else {
+          Int_t count=0;
+          for(Int_t i=0;i<fTotFlags;++i)
+            if(fSelections[i]->NeedsExtraWeight()) {
+              if((combinedbit&(1<<i)))
+                ((AliGFWWeights*)fWeightList->At(count))->Fill(lTrack->Phi(),lTrack->Eta(),vz,lTrack->Pt(),cent,0);
+              count++;
+            };
+        };
     };
     PostData(1,fWeightList);
     if(fAddQA) PostData(2,fQAList);
@@ -374,6 +381,7 @@ void AliAnalysisTaskGFWFlow::UserExec(Option_t*) {
   } else {
     fGFW->Clear();
     AliAODTrack *lTrack;
+    if(!fSelections[fCurrSystFlag]->AcceptVertex(fAOD,1)) return;
     for(Int_t lTr=0;lTr<fAOD->GetNumberOfTracks();lTr++) {
       lTrack = (AliAODTrack*)fAOD->GetTrack(lTr);
       //if(!AcceptAODTrack(lTrack,tca)) continue;
@@ -384,16 +392,22 @@ void AliAnalysisTaskGFWFlow::UserExec(Option_t*) {
       Double_t dcaxy = TMath::Sqrt(DCA[0]*DCA[0]+DCA[1]*DCA[1]);
       Double_t lDCA[] = {TMath::Abs(DCA[2]),dcaxy};
       if(!fSelections[fCurrSystFlag]->AcceptTrack(lTrack,lDCA) &&
-	 !fSelections[9]->AcceptTrack(lTrack,lDCA)) continue;
+      	 !fSelections[9]->AcceptTrack(lTrack,lDCA)) continue;
+
+      Double_t l_pT=lTrack->Pt();
+      Bool_t WithinPtPOI = (fPOIpTMin<l_pT) && (l_pT<fPOIpTMax); //within POI pT range
+      Bool_t WithinPtRF  = (fRFpTMin <l_pT) && (l_pT<fRFpTMax);  //within RF pT range
+      if(!WithinPtPOI && !WithinPtRF) continue; //if the track is not within any pT range, then continue
       if(!fWeights) printf("Weights do not exist!\n");
-      Double_t nua = fWeights->GetWeight(lTrack->Phi(),lTrack->Eta(),vz,lTrack->Pt(),cent,0);
+      Double_t nua = fWeights->GetWeight(lTrack->Phi(),lTrack->Eta(),vz,l_pT,cent,0);
       //Double_t nuaITS = fExtraWeights->GetWeight(lTrack->Phi(),lTrack->Eta(),vz,lTrack->Pt(),cent,0);
-      Double_t nue = fPtAxis->GetNbins()>1?1:fWeights->GetWeight(lTrack->Phi(),lTrack->Eta(),vz,cent,lTrack->Pt(),1);
+      Double_t nue = fPtAxis->GetNbins()>1?1:fWeights->GetWeight(lTrack->Phi(),lTrack->Eta(),vz,cent,l_pT,1);
       if(fSelections[fCurrSystFlag]->AcceptTrack(lTrack, lDCA)) {
-	fGFW->Fill(lTrack->Eta(),fPtAxis->FindBin(lTrack->Pt())-1,lTrack->Phi(),nua*nue,1);
-      };
+      	if(WithinPtPOI) fGFW->Fill(lTrack->Eta(),fPtAxis->FindBin(l_pT)-1,lTrack->Phi(),nua*nue,1); //Fill POI (mask = 1)
+        if(WithinPtRF)  fGFW->Fill(lTrack->Eta(),fPtAxis->FindBin(l_pT)-1,lTrack->Phi(),nua*nue,2); //Fit RF (mask = 2)
+      }
       /*if(fSelections[9]->AcceptTrack(lTrack, lDCA)) //No ITS for now
-	fGFW->Fill(lTrack->Eta(),fPtAxis->FindBin(lTrack->Pt())-1,lTrack->Phi(),nuaITS*nue,2);*/ 
+	fGFW->Fill(lTrack->Eta(),fPtAxis->FindBin(lTrack->Pt())-1,lTrack->Phi(),nuaITS*nue,2);*/
     };
     TRandom rndm(0);
     Double_t rndmn=rndm.Rndm();
@@ -511,10 +525,20 @@ void AliAnalysisTaskGFWFlow::UserExec(Option_t*) {
 
     PostData(1,fFC);
     if(fAddQA) PostData(2,fQAList);
-  }; 
+  };
 };
 void AliAnalysisTaskGFWFlow::Terminate(Option_t*) {
 };
+void AliAnalysisTaskGFWFlow::SetPtBins(Int_t nBins, Double_t *bins, Double_t RFpTMin, Double_t RFpTMax) {
+  fPtAxis->Set(nBins, bins);
+  //Set pT range given by the defined pT axis
+  fPOIpTMin=bins[0];
+  fPOIpTMax=bins[nBins];
+  //if RF pT range is not defined, use the same as for POI
+  fRFpTMin=(RFpTMin<0)?fPOIpTMin:RFpTMin;
+  fRFpTMax=(RFpTMax<0)?fPOIpTMax:RFpTMax;
+}
+
 Bool_t AliAnalysisTaskGFWFlow::AcceptEvent() {
   if(!fEventCuts.AcceptEvent(fInputEvent)) return 0;
   UInt_t fSelMask = ((AliInputEventHandler*)(AliAnalysisManager::GetAnalysisManager()->GetInputEventHandler()))->IsEventSelected();
@@ -526,7 +550,7 @@ Bool_t AliAnalysisTaskGFWFlow::AcceptAODVertex(AliAODEvent *inEv) {
   const AliAODVertex* vtx = dynamic_cast<const AliAODVertex*>(inEv->GetPrimaryVertex());
   if(!vtx || vtx->GetNContributors() < 1)
     return kFALSE;
-  
+
   const AliAODVertex* vtxSPD = dynamic_cast<const AliAODVertex*>(inEv->GetPrimaryVertexSPD());
   Double_t dMaxResol = 0.25; // suggested from DPG
   Double_t cov[6] = {0};
@@ -537,42 +561,29 @@ Bool_t AliAnalysisTaskGFWFlow::AcceptAODVertex(AliAODEvent *inEv) {
   const Double_t aodVtxZ = vtx->GetZ();
   if(TMath::Abs(aodVtxZ) > 10)
     return kFALSE;
-  
+
   return kTRUE;
 };
-Bool_t AliAnalysisTaskGFWFlow::AcceptAODTrack(AliAODTrack *mtr, TClonesArray *tca) {
-  if(TMath::Abs(mtr->Eta())>1.6) return kFALSE;
-  if(mtr->Pt()<0.2) return kFALSE;
-  if(mtr->Pt()>20) return kFALSE;
-  if(!mtr->TestFilterBit(2+96+768)) return kFALSE;
-  //if(mtr->GetTPCNclsF()<70) return kFALSE; //This will be done in the Selection object
-  if(tca) {
-    Int_t mcind = TMath::Abs(mtr->GetLabel());
-    AliAODMCParticle *lp = (AliAODMCParticle*)tca->At(mcind);
-    if(!lp->IsPhysicalPrimary()) return kFALSE;
-    if(lp->Charge()==0) return kFALSE;
-  };
-  return kTRUE;
-};
+
 Bool_t AliAnalysisTaskGFWFlow::AcceptParticle(AliVParticle *mpa) {
   if(!mpa->IsPhysicalPrimary()) return kFALSE;
   if(mpa->Charge()==0) return kFALSE;
   if(TMath::Abs(mpa->Eta())>0.8) return kFALSE;
   if(mpa->Pt()<0.3) return kFALSE;
-  if(mpa->Pt()>3) return kFALSE;
+  if(mpa->Pt()>20) return kFALSE;
   return kTRUE;
 };
 Int_t AliAnalysisTaskGFWFlow::GetVtxBit(AliAODEvent *mev) {
   Int_t retbit=0;
   for(Int_t vtxst=fTotTrackFlags+1;vtxst<fTotFlags; vtxst++) //vtx flags are 9-14
     retbit+=fSelections[vtxst]->AcceptVertex(mev,vtxst);
-  
+
   //PU unc. bit has been set with a wide cut. Override with a check w/ smaller cut:
   Int_t PUSystFlag = 1<<(fTotTrackFlags+6);//PU syst. flag is 6-th in ev/vtx selection
   //Only override if the event has passed the initial selection:
   if((retbit&PUSystFlag)==PUSystFlag) //if event accepted by nominal cuts
     if(!fEventCutsForPU.AcceptEvent(mev)) //Check if it gets rejected by the PU cut
-    retbit-=PUSystFlag; //and if so, set the PU flag to zero    
+    retbit-=PUSystFlag; //and if so, set the PU flag to zero
   retbit+=fSelections[0]->AcceptVertex(mev); //the standard one
   return retbit;
 };
@@ -619,7 +630,7 @@ Bool_t AliAnalysisTaskGFWFlow::LoadWeights(Int_t runno) { //Cannot be used when 
     return kTRUE;
   } else {
     AliFatal("Weight list (for some reason) not set!\n");
-    return kFALSE; 
+    return kFALSE;
   };
   printf("You should not be here!\n");
   return kFALSE;
@@ -688,4 +699,3 @@ Bool_t AliAnalysisTaskGFWFlow::FillFCs(TString head, TString hn, Double_t cent, 
   };
   return kTRUE;
 };
-

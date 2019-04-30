@@ -77,6 +77,7 @@
 #include "AliEmcalJet.h"
 #include "AliRhoParameter.h"
 #include "AliAnalysisTaskSEHFTreeCreator.h"
+#include "AliAODPidHF.h"
 
 using std::cout;
 using std::endl;
@@ -194,7 +195,9 @@ fFillZLeading(false),
 fFillRadialMoment(false),
 fFillpTD(false),
 fFillMass(false),
-fFillMatchingJetID(false)
+fFillMatchingJetID(false),
+fEnableNsigmaTPCDataCorr(false),
+fSystemForNsigmaTPCDataCorr(AliAODPidHF::kNone)
 {
 
 /// Default constructor
@@ -311,7 +314,9 @@ fFillZLeading(false),
 fFillRadialMoment(false),
 fFillpTD(false),
 fFillMass(false),
-fFillMatchingJetID(false)
+fFillMatchingJetID(false),
+fEnableNsigmaTPCDataCorr(false),
+fSystemForNsigmaTPCDataCorr(AliAODPidHF::kNone)
 {
     /// Standard constructor
   
@@ -721,6 +726,7 @@ void AliAnalysisTaskSEHFTreeCreator::UserCreateOutputObjects()
         fTreeHandlerD0 = new AliHFTreeHandlerD0toKpi(fPIDoptD0);
         fTreeHandlerD0->SetOptSingleTrackVars(fTreeSingleTrackVarsOpt);
         if(fReadMC && fWriteOnlySignal) fTreeHandlerD0->SetFillOnlySignal(fWriteOnlySignal);
+        if(fEnableNsigmaTPCDataCorr) fTreeHandlerD0->EnableNsigmaTPCDataDrivenCorrection(fSystemForNsigmaTPCDataCorr);
         fVariablesTreeD0 = (TTree*)fTreeHandlerD0->BuildTree(nameoutput,nameoutput);
         fVariablesTreeD0->SetMaxVirtualSize(1.e+8/nEnabledTrees);
         fTreeEvChar->AddFriend(fVariablesTreeD0);
@@ -740,6 +746,7 @@ void AliAnalysisTaskSEHFTreeCreator::UserCreateOutputObjects()
         fTreeHandlerDs = new AliHFTreeHandlerDstoKKpi(fPIDoptDs);
         fTreeHandlerDs->SetOptSingleTrackVars(fTreeSingleTrackVarsOpt);
         if(fReadMC && fWriteOnlySignal) fTreeHandlerDs->SetFillOnlySignal(fWriteOnlySignal);
+        if(fEnableNsigmaTPCDataCorr) fTreeHandlerDs->EnableNsigmaTPCDataDrivenCorrection(fSystemForNsigmaTPCDataCorr);
         fTreeHandlerDs->SetMassKKOption(fDsMassKKOpt);
         fVariablesTreeDs = (TTree*)fTreeHandlerDs->BuildTree(nameoutput,nameoutput);
         fVariablesTreeDs->SetMaxVirtualSize(1.e+8/nEnabledTrees);
@@ -760,6 +767,7 @@ void AliAnalysisTaskSEHFTreeCreator::UserCreateOutputObjects()
         fTreeHandlerDplus = new AliHFTreeHandlerDplustoKpipi(fPIDoptDplus);
         fTreeHandlerDplus->SetOptSingleTrackVars(fTreeSingleTrackVarsOpt);
         if(fReadMC && fWriteOnlySignal) fTreeHandlerDplus->SetFillOnlySignal(fWriteOnlySignal);
+        if(fEnableNsigmaTPCDataCorr) fTreeHandlerDplus->EnableNsigmaTPCDataDrivenCorrection(fSystemForNsigmaTPCDataCorr);
         fVariablesTreeDplus = (TTree*)fTreeHandlerDplus->BuildTree(nameoutput,nameoutput);
         fVariablesTreeDplus->SetMaxVirtualSize(1.e+8/nEnabledTrees);
         fTreeEvChar->AddFriend(fVariablesTreeDplus);
@@ -778,6 +786,7 @@ void AliAnalysisTaskSEHFTreeCreator::UserCreateOutputObjects()
         fTreeHandlerLctopKpi = new AliHFTreeHandlerLctopKpi(fPIDoptLctopKpi);
         fTreeHandlerLctopKpi->SetOptSingleTrackVars(fTreeSingleTrackVarsOpt);
         if(fReadMC && fWriteOnlySignal) fTreeHandlerLctopKpi->SetFillOnlySignal(fWriteOnlySignal);
+        if(fEnableNsigmaTPCDataCorr) fTreeHandlerLctopKpi->EnableNsigmaTPCDataDrivenCorrection(fSystemForNsigmaTPCDataCorr);
         fVariablesTreeLctopKpi = (TTree*)fTreeHandlerLctopKpi->BuildTree(nameoutput,nameoutput);
         fVariablesTreeLctopKpi->SetMaxVirtualSize(1.e+8/nEnabledTrees);
         fTreeEvChar->AddFriend(fVariablesTreeLctopKpi);
@@ -796,6 +805,7 @@ void AliAnalysisTaskSEHFTreeCreator::UserCreateOutputObjects()
         fTreeHandlerBplus = new AliHFTreeHandlerBplustoD0pi(fPIDoptBplus);
         fTreeHandlerBplus->SetOptSingleTrackVars(fTreeSingleTrackVarsOpt);
         if(fReadMC && fWriteOnlySignal) fTreeHandlerBplus->SetFillOnlySignal(fWriteOnlySignal);
+        if(fEnableNsigmaTPCDataCorr) fTreeHandlerBplus->EnableNsigmaTPCDataDrivenCorrection(fSystemForNsigmaTPCDataCorr);
         fVariablesTreeBplus = (TTree*)fTreeHandlerBplus->BuildTree(nameoutput,nameoutput);
         fVariablesTreeBplus->SetMaxVirtualSize(1.e+8/nEnabledTrees);
         fTreeEvChar->AddFriend(fVariablesTreeBplus);
@@ -814,6 +824,7 @@ void AliAnalysisTaskSEHFTreeCreator::UserCreateOutputObjects()
         fTreeHandlerDstar = new AliHFTreeHandlerDstartoKpipi(fPIDoptDstar);
         fTreeHandlerDstar->SetOptSingleTrackVars(fTreeSingleTrackVarsOpt);
         if(fReadMC && fWriteOnlySignal) fTreeHandlerDstar->SetFillOnlySignal(fWriteOnlySignal);
+        if(fEnableNsigmaTPCDataCorr) fTreeHandlerDstar->EnableNsigmaTPCDataDrivenCorrection(fSystemForNsigmaTPCDataCorr);
         fVariablesTreeDstar = (TTree*)fTreeHandlerDstar->BuildTree(nameoutput,nameoutput);
         fVariablesTreeDstar->SetMaxVirtualSize(1.e+8/nEnabledTrees);
         fTreeEvChar->AddFriend(fVariablesTreeDstar);
@@ -832,6 +843,7 @@ void AliAnalysisTaskSEHFTreeCreator::UserCreateOutputObjects()
         fTreeHandlerLc2V0bachelor = new AliHFTreeHandlerLc2V0bachelor(fPIDoptLc2V0bachelor);
         fTreeHandlerLc2V0bachelor->SetOptSingleTrackVars(fTreeSingleTrackVarsOpt);
         if(fReadMC && fWriteOnlySignal) fTreeHandlerLc2V0bachelor->SetFillOnlySignal(fWriteOnlySignal);
+        if(fEnableNsigmaTPCDataCorr) fTreeHandlerLc2V0bachelor->EnableNsigmaTPCDataDrivenCorrection(fSystemForNsigmaTPCDataCorr);
         fTreeHandlerLc2V0bachelor->SetCalcSecoVtx(fLc2V0bachelorCalcSecoVtx);
         fVariablesTreeLc2V0bachelor = (TTree*)fTreeHandlerLc2V0bachelor->BuildTree(nameoutput,nameoutput);
         fVariablesTreeLc2V0bachelor->SetMaxVirtualSize(1.e+8/nEnabledTrees);
@@ -953,7 +965,7 @@ void AliAnalysisTaskSEHFTreeCreator::FillJetTree() {
 
   // Loop through jet containers, set jet variables for each, and fill each tree
   for(Int_t i =0; i<fJetCollArray.GetEntriesFast(); i++) {
-    fTreeHandlerJet.at(i)->FillTree(fEventID);
+    fTreeHandlerJet.at(i)->FillTree(fRunNumber, fEventID);
   }
 
 }
@@ -2239,7 +2251,7 @@ void AliAnalysisTaskSEHFTreeCreator::ProcessDstar(TClonesArray *arrayDstar, AliA
                         labDstar = d->MatchToMC(413,421,pdgDgDStartoD0pi, pdgDgD0toKpi, arrMC);
                         if(labDstar>=0){
                             partDstar = (AliAODMCParticle*)arrMC->At(labDstar);
-                            pdgDstar = partDstar->GetPdgCode();
+                            pdgDstar = TMath::Abs(partDstar->GetPdgCode());
                             origin = AliVertexingHFUtils::CheckOrigin(arrMC,partDstar,kTRUE);
                         }
                     }
@@ -2377,7 +2389,7 @@ void AliAnalysisTaskSEHFTreeCreator::ProcessCasc(TClonesArray *arrayCasc, AliAOD
             labLc2V0bachelor = d->MatchToMC(4122,310,pdgDgLc2K0Spr, pdgDgK0stoDaughters, arrMC, kTRUE);
             if(labLc2V0bachelor>=0){
               partLc2V0bachelor = (AliAODMCParticle*)arrMC->At(labLc2V0bachelor);
-              pdgLc2V0bachelor = partLc2V0bachelor->GetPdgCode();
+              pdgLc2V0bachelor = TMath::Abs(partLc2V0bachelor->GetPdgCode());
               origin = AliVertexingHFUtils::CheckOrigin(arrMC,partLc2V0bachelor,kTRUE);
             }
           }
@@ -2512,7 +2524,7 @@ void AliAnalysisTaskSEHFTreeCreator::ProcessMCGen(TClonesArray *arrayMC){
         else if(absPDG == 4122 && fWriteVariableTreeLc2V0bachelor) {
           deca = AliVertexingHFUtils::CheckLcV0bachelorDecay(arrayMC,mcPart,labDau2);
           if(deca!=1 || labDau2[0]<0 || labDau2[1]<0) continue;
-          isDaugInAcc = CheckDaugAcc(arrayMC,2,labDau2);
+          isDaugInAcc = CheckDaugAcc(arrayMC,3,labDau2);
           fTreeHandlerGenLc2V0bachelor->SetDauInAcceptance(isDaugInAcc);
           fTreeHandlerGenLc2V0bachelor->SetCandidateType(kTRUE,kFALSE,isPrimary,isFeeddown,kFALSE);
           fTreeHandlerGenLc2V0bachelor->SetMCGenVariables(fRunNumber,fEventID, mcPart);

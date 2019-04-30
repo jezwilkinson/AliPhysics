@@ -200,6 +200,7 @@ set(SRCS
     UserTasks/AliAnalysisTaskEmcalTmpSparseMaker.cxx
     UserTasks/AliAnalysisTaskEmcalTriggerInfoQA.cxx
     UserTasks/AliAnalysisTaskEmcalTriggerTreeWriter.cxx
+    UserTasks/AliAnalysisTaskEventExtractor.cxx
     UserTasks/AliAnalysisTaskHJetEmbed.cxx
     UserTasks/AliAnalysisTaskJetJTJT.cxx
     UserTasks/AliAnalysisTaskJetMassResponseDet.cxx
@@ -302,7 +303,7 @@ else()
     set(ROOT_DEPENDENCIES)
 endif()
 
-set(ALIROOT_DEPENDENCIES ANALYSIS CORRFW PHOSbase PWGEMCALbase PWGEMCALtrigger PWGJETFW PWGCaloTrackCorrBase)
+set(ALIROOT_DEPENDENCIES ANALYSIS CORRFW PHOSbase PWGEMCALbase PWGEMCALtrigger PWGJETFW PWGCaloTrackCorrBase PWGDevNanoAOD)
 if(FASTJET_FOUND)
     set(ALIROOT_DEPENDENCIES JETAN ${ALIROOT_DEPENDENCIES})
 endif(FASTJET_FOUND)

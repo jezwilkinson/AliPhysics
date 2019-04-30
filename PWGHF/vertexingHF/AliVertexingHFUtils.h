@@ -85,10 +85,13 @@ class AliVertexingHFUtils : public TObject{
   static Double_t GetFullEvResolLowLim(const TH1F* hSubEvCorr, Int_t k=1);
   static Double_t GetFullEvResolHighLim(const TH1F* hSubEvCorr, Int_t k=1);
   static TString  GetGenerator(Int_t label, AliAODMCHeader* header); 
-  Bool_t IsTrackInjected(AliAODTrack *track,AliAODMCHeader *header,TClonesArray *arrayMC);
-  void GetTrackPrimaryGenerator(AliAODTrack *track,AliAODMCHeader *header,TClonesArray *arrayMC,TString &nameGen);
-  Bool_t IsCandidateInjected(AliAODRecoDecayHF *cand, AliAODMCHeader *header,TClonesArray *arrayMC);
-  Bool_t HasCascadeCandidateAnyDaughInjected(AliAODRecoCascadeHF *cand, AliAODMCHeader *header,TClonesArray *arrayMC);
+  static Bool_t IsTrackInjected(Int_t label,AliAODMCHeader *header,TClonesArray *arrayMC);
+  static Bool_t IsTrackInjected(AliAODTrack *track,AliAODMCHeader *header,TClonesArray *arrayMC);
+  static void GetTrackPrimaryGenerator(AliAODTrack *track,AliAODMCHeader *header,TClonesArray *arrayMC,TString &nameGen);
+  static void GetTrackPrimaryGenerator(Int_t label,AliAODMCHeader *header,TClonesArray *arrayMC,TString &nameGen);
+  static Bool_t IsCandidateInjected(AliAODRecoDecayHF *cand, AliAODMCHeader *header,TClonesArray *arrayMC);
+  static Bool_t IsCandidateInjected(AliAODRecoDecayHF *cand, AliAODEvent* aod, AliAODMCHeader *header,TClonesArray *arrayMC);
+  static Bool_t HasCascadeCandidateAnyDaughInjected(AliAODRecoCascadeHF *cand, AliAODMCHeader *header,TClonesArray *arrayMC);
   /// Functions for tracklet multiplcity calculation
   void SetEtaRangeForTracklets(Double_t mineta, Double_t maxeta){
     fMinEtaForTracklets=mineta; 
@@ -146,6 +149,9 @@ class AliVertexingHFUtils : public TObject{
   /// Functions to check the decay tree
   static Int_t CheckOrigin(TClonesArray* arrayMC, AliAODMCParticle *mcPart, Bool_t searchUpToQuark=kTRUE);
   static Int_t CheckOrigin(AliMCEvent* mcEvent, AliMCParticle *mcPart, Bool_t searchUpToQuark=kTRUE);
+  static Bool_t IsTrackFromCharm(AliAODTrack* tr, TClonesArray* arrayMC);
+  static Bool_t IsTrackFromBeauty(AliAODTrack* tr, TClonesArray* arrayMC);
+  static Bool_t IsTrackFromHadronDecay(Int_t pdgMoth, AliAODTrack* tr, TClonesArray* arrayMC);
   static Double_t GetBeautyMotherPt(TClonesArray* arrayMC, AliAODMCParticle *mcPart);
   static Int_t CheckD0Decay(AliMCEvent* mcEvent, Int_t label, Int_t* arrayDauLab);
   static Int_t CheckD0Decay(TClonesArray* arrayMC, AliAODMCParticle *mcPart, Int_t* arrayDauLab);

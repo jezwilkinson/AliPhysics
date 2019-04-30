@@ -50,8 +50,10 @@ ClassImp(AliAnalysisTaskCombinHF);
 AliAnalysisTaskCombinHF::AliAnalysisTaskCombinHF():
   AliAnalysisTaskSE(),
   fOutput(0x0),
+  fListCuts(0x0),
   fHistNEvents(0x0),
   fHistEventMultCent(0x0),
+  fHistEventMultCentEvSel(0x0),
   fHistEventMultZv(0x0),
   fHistEventMultZvEvSel(0x0),
   fHistTrackStatus(0x0),
@@ -113,8 +115,10 @@ AliAnalysisTaskCombinHF::AliAnalysisTaskCombinHF():
   fCounter(0x0),
   fMeson(kDzero),
   fReadMC(kFALSE),
+  fEnforceMBTrigMaskInMC(kTRUE),
   fGoUpToQuark(kTRUE),
   fFullAnalysis(0),
+  fSignalOnlyMC(kFALSE),
   fPIDstrategy(knSigma),
   fmaxPforIDPion(0.8),
   fmaxPforIDKaon(2.),
@@ -149,8 +153,10 @@ AliAnalysisTaskCombinHF::AliAnalysisTaskCombinHF():
 AliAnalysisTaskCombinHF::AliAnalysisTaskCombinHF(Int_t meson, AliRDHFCuts* analysiscuts):
   AliAnalysisTaskSE("DmesonCombin"),
   fOutput(0x0),
+  fListCuts(0x0),
   fHistNEvents(0x0),
   fHistEventMultCent(0x0),
+  fHistEventMultCentEvSel(0x0),
   fHistEventMultZv(0x0),
   fHistEventMultZvEvSel(0x0),
   fHistTrackStatus(0x0),
@@ -212,8 +218,10 @@ AliAnalysisTaskCombinHF::AliAnalysisTaskCombinHF(Int_t meson, AliRDHFCuts* analy
   fCounter(0x0),
   fMeson(meson),
   fReadMC(kFALSE),
+  fEnforceMBTrigMaskInMC(kTRUE),
   fGoUpToQuark(kTRUE),
   fFullAnalysis(0),
+  fSignalOnlyMC(kFALSE),
   fPIDstrategy(knSigma),
   fmaxPforIDPion(0.8),
   fmaxPforIDKaon(2.),
@@ -245,6 +253,7 @@ AliAnalysisTaskCombinHF::AliAnalysisTaskCombinHF(Int_t meson, AliRDHFCuts* analy
 
   DefineOutput(1,TList::Class());  //My private output
   DefineOutput(2,AliNormalizationCounter::Class());
+  DefineOutput(3,TList::Class());
 }
 
 //________________________________________________________________________
@@ -256,6 +265,7 @@ AliAnalysisTaskCombinHF::~AliAnalysisTaskCombinHF()
   if(fOutput && !fOutput->IsOwner()){
     delete fHistNEvents;
     delete fHistEventMultCent;
+    delete fHistEventMultCentEvSel;
     delete fHistEventMultZv;
     delete fHistEventMultZvEvSel;
     delete fHistTrackStatus;
@@ -292,6 +302,7 @@ AliAnalysisTaskCombinHF::~AliAnalysisTaskCombinHF()
   }
 
   delete fOutput;
+  if (fListCuts) delete fListCuts;
   delete fCounter;
   delete fTrackCutsAll;
   delete fTrackCutsPion;
@@ -361,13 +372,16 @@ void AliAnalysisTaskCombinHF::UserCreateOutputObjects()
   fHistNEvents->SetMinimum(0);
   fOutput->Add(fHistNEvents);
 
-  fHistEventMultCent = new TH2F("hEventMultCent","",100,0.,100.,200,fMinMultiplicity,fMaxMultiplicity);
+  fHistEventMultCent = new TH2F("hEventMultCent"," ; Centrality (V0M) ; N_{tracklets} (|#eta|<1)",100,0.,100.,200,fMinMultiplicity,fMaxMultiplicity);
   fOutput->Add(fHistEventMultCent);
 
-  fHistEventMultZv = new TH2F("hEventMultZv","",30,-15.,15.,200,fMinMultiplicity,fMaxMultiplicity);
+  fHistEventMultCentEvSel = new TH2F("hEventMultCentEvSel"," ; Centrality (V0M) ; N_{tracklets} (|#eta|<1)",100,0.,100.,200,fMinMultiplicity,fMaxMultiplicity);
+  fOutput->Add(fHistEventMultCentEvSel);
+
+  fHistEventMultZv = new TH2F("hEventMultZv"," ; z_{vertex} (cm) ; N_{tracklets} (|#eta|<1)",30,-15.,15.,200,fMinMultiplicity,fMaxMultiplicity);
   fOutput->Add(fHistEventMultZv);
 
-  fHistEventMultZvEvSel = new TH2F("hEventMultZvEvSel","",30,-15.,15.,200,fMinMultiplicity,fMaxMultiplicity);
+  fHistEventMultZvEvSel = new TH2F("hEventMultZvEvSel"," ; z_{vertex} (cm) ; N_{tracklets} (|#eta|<1)",30,-15.,15.,200,fMinMultiplicity,fMaxMultiplicity);
   fOutput->Add(fHistEventMultZvEvSel);
 
   fHistTrackStatus  = new TH1F("hTrackStatus", "",8,-0.5,7.5);
@@ -558,6 +572,43 @@ void AliAnalysisTaskCombinHF::UserCreateOutputObjects()
   //Counter for Normalization
   fCounter = new AliNormalizationCounter("NormalizationCounter");
   fCounter->Init();
+
+  fListCuts = new TList();
+  fListCuts->SetOwner();
+  if(fTrackCutsAll){
+    AliESDtrackCuts* tatosave=new AliESDtrackCuts(*fTrackCutsAll);
+    fListCuts->Add(tatosave);
+  }
+  if(fTrackCutsPion){
+    AliESDtrackCuts* tptosave=new AliESDtrackCuts(*fTrackCutsPion);
+    tptosave->SetName(Form("%sForPions",fTrackCutsPion->GetName()));
+    fListCuts->Add(tptosave);
+  }
+  if(fTrackCutsKaon){
+    AliESDtrackCuts* tktosave=new AliESDtrackCuts(*fTrackCutsKaon);
+    tktosave->SetName(Form("%sForKaons",fTrackCutsKaon->GetName()));
+    fListCuts->Add(tktosave);
+  }
+  if(fPidHF){
+    AliAODPidHF* pidtosave=new AliAODPidHF(*fPidHF);
+    fListCuts->Add(pidtosave);
+  }
+  TH1F* hCutValues = new TH1F("hCutValues","",6,0.5,6.5);
+  hCutValues->SetBinContent(1,fFilterMask);
+  hCutValues->GetXaxis()->SetBinLabel(1,"Filter bit");
+  hCutValues->SetBinContent(2,(Float_t)fApplyCutCosThetaStar);
+  hCutValues->GetXaxis()->SetBinLabel(2,"Use costhetastar (D0)");
+  hCutValues->SetBinContent(3,fCutCosThetaStar);
+  hCutValues->GetXaxis()->SetBinLabel(3,"costhetastar (D0)");
+  hCutValues->SetBinContent(4,fPhiMassCut);
+  hCutValues->GetXaxis()->SetBinLabel(4,"phi mass (Ds)");
+  hCutValues->SetBinContent(5,fCutCos3PiKPhiRFrame);
+  hCutValues->GetXaxis()->SetBinLabel(5,"cos3piK (Ds)");
+  hCutValues->SetBinContent(6,fCutCosPiDsLabFrame);
+  hCutValues->GetXaxis()->SetBinLabel(6,"cospiDs (Ds)");
+  fListCuts->Add(hCutValues);
+  PostData(3, fListCuts);
+
   
   fKaonTracks = new TObjArray();
   fPionTracks=new TObjArray();
@@ -597,15 +648,20 @@ void AliAnalysisTaskCombinHF::UserExec(Option_t */*option*/){
   // the AODs with null vertex pointer didn't pass the PhysSel
   if(!aod->GetPrimaryVertex() || TMath::Abs(aod->GetMagneticField())<0.001) return;
 
-  // Reject events with trigger mask 0 of the LHC13d3 production
-  // For these events the ITS layers are skipped in the trakcing
-  // and the vertex reconstruction efficiency from tracks is biased
   if(fReadMC){
-   Int_t runnumber = aod->GetRunNumber();
-   if(aod->GetTriggerMask()==0 &&
-      (runnumber>=195344 && runnumber<=195677)){
-     return;
-   }
+    // Reject events with trigger mask 0 of the LHC13d3 production
+    // For these events the ITS layers are skipped in the trakcing
+    // and the vertex reconstruction efficiency from tracks is biased
+    Int_t runnumber = aod->GetRunNumber();
+    if(aod->GetTriggerMask()==0 &&
+       (runnumber>=195344 && runnumber<=195677)){
+      return;
+    }
+    // Set the trigger mask for physics selection to kMB in the MC
+    if(fEnforceMBTrigMaskInMC){
+      //      printf("Enforce trigger mask to kMB, previous mask = %d\n",fAnalysisCuts->GetTriggerMask());
+      fAnalysisCuts->SetTriggerMask(AliVEvent::kMB);
+    }
   }
 
   AliAnalysisManager *mgr = AliAnalysisManager::GetAnalysisManager();
@@ -639,12 +695,18 @@ void AliAnalysisTaskCombinHF::UserExec(Option_t */*option*/){
     }
   }
 
-  if(fAnalysisCuts->GetUseCentrality()>0 && fAnalysisCuts->IsEventSelectedInCentrality(aod)!=0) return;
-  // events not passing the centrality selection can be removed immediately. For the others we must count the generated D mesons
-
   Int_t ntracks=aod->GetNumberOfTracks();
   fVtxZ = aod->GetPrimaryVertex()->GetZ();
   fMultiplicity = AliVertexingHFUtils::GetNumberOfTrackletsInEtaRange(aod,-1.,1.); 
+  Float_t evCentr=fAnalysisCuts->GetCentrality(aod);
+  if(!fAnalysisCuts->IsEventRejectedDueToTrigger() && !fAnalysisCuts->IsEventRejectedDuePhysicsSelection() &&
+     !fAnalysisCuts->IsEventRejectedDueToBadPrimaryVertex() && !fAnalysisCuts->IsEventRejectedDueToZVertexOutsideFiducialRegion()){
+    fHistEventMultCent->Fill(evCentr,fMultiplicity);
+  }
+
+  if(fAnalysisCuts->GetUseCentrality()>0 && fAnalysisCuts->IsEventSelectedInCentrality(aod)!=0) return;
+  // events not passing the centrality selection can be removed immediately. For the others we must count the generated D mesons
+
 
   TClonesArray *arrayMC=0;
   AliAODMCHeader *mcHeader=0;
@@ -667,16 +729,23 @@ void AliAnalysisTaskCombinHF::UserExec(Option_t */*option*/){
     }
     fHistEventMultZv->Fill(zMCVertex,fMultiplicity);
     if(isEvSel) fHistEventMultZvEvSel->Fill(zMCVertex,fMultiplicity);
+    // switch off event mixing in case of signal only MC
+    if(fSignalOnlyMC) fDoEventMixing=0;
   }else{
     fHistEventMultZv->Fill(fVtxZ,fMultiplicity);
     if(isEvSel) fHistEventMultZvEvSel->Fill(fVtxZ,fMultiplicity);
   }
 
+
   if(!isEvSel)return;
   
-  Float_t evCentr=fAnalysisCuts->GetCentrality(aod);
   fHistNEvents->Fill(1);
-  fHistEventMultCent->Fill(evCentr,fMultiplicity);
+  fHistEventMultCentEvSel->Fill(evCentr,fMultiplicity);
+
+
+  Int_t pdgOfD=421;
+  if(fMeson==kDplus) pdgOfD=411;
+  else if(fMeson==kDs) pdgOfD=431;
 
   // select and flag tracks
   UChar_t* status = new UChar_t[ntracks];
@@ -686,6 +755,11 @@ void AliAnalysisTaskCombinHF::UserExec(Option_t */*option*/){
     if(!track){
       AliWarning("Error in casting track to AOD track. Not a standard AOD?");
       continue;
+    }
+    if(fReadMC && fSignalOnlyMC && arrayMC){
+      // for fast MC analysis we skip tracks not coming from charm hadrons
+      Bool_t isCharm=AliVertexingHFUtils::IsTrackFromHadronDecay(pdgOfD,track,arrayMC);
+      if(!isCharm) continue;
     }
     if(IsTrackSelected(track)) status[iTr]+=1;
     
@@ -872,7 +946,8 @@ void AliAnalysisTaskCombinHF::UserExec(Option_t */*option*/){
 //________________________________________________________________________
 void AliAnalysisTaskCombinHF::FillLSHistos(Int_t pdgD,Int_t nProngs, AliAODRecoDecay* tmpRD, Double_t* px, Double_t* py, Double_t* pz, UInt_t *pdgdau, Int_t charge){
   /// Fill histos for LS candidates
-  
+
+  if(fReadMC && fSignalOnlyMC) return;
   tmpRD->SetPxPyPzProngs(nProngs,px,py,pz);
   Double_t pt = tmpRD->Pt();
   Double_t minv2 = tmpRD->InvMass2(nProngs,pdgdau);
@@ -999,13 +1074,17 @@ Bool_t AliAnalysisTaskCombinHF::FillHistos(Int_t pdgD,Int_t nProngs, AliAODRecoD
 	      }
 	    }
 	  }else{
-	    fMassVsPtVsYBkg->Fill(mass,pt,rapid);
+	    if(fSignalOnlyMC) accept=kFALSE;
+	    else fMassVsPtVsYBkg->Fill(mass,pt,rapid);
 	  }
 	}
       }
     }
   }
-  
+  // skip track rotations in case of signal only MC
+  if(fReadMC && fSignalOnlyMC) return accept;
+
+  // Track rotations to estimate the background
   Int_t nRotated=0;
   Double_t massRot=0;// calculated later only if candidate is acceptable
   Double_t angleProngXY;

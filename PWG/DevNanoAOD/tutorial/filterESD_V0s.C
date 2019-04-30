@@ -23,7 +23,6 @@ void filterESD_V0s()
   gInterpreter->ExecuteMacro("$ALICE_PHYSICS/PWGPP/TPC/macros/AddTaskConfigOCDB.C(\"raw://\")");
   
   // V0 finder
-  // TODO this should only run for selected events
   AliAnalysisTaskWeakDecayVertexer* v0Finder = (AliAnalysisTaskWeakDecayVertexer*) gInterpreter->ExecuteMacro("$ALICE_PHYSICS/PWGLF/STRANGENESS/Cascades/Run2/macros/AddTaskWeakDecayVertexer.C");
   v0Finder->SetUseImprovedFinding();
   
@@ -32,14 +31,11 @@ void filterESD_V0s()
   
   AliAnalysisTaskNanoAODFilter* task = (AliAnalysisTaskNanoAODFilter*) gInterpreter->ExecuteMacro("$ALICE_PHYSICS/PWG/DevNanoAOD/AddTaskNanoAODFilter.C(0, kFALSE)");
   task->AddSetter(new AliNanoAODSimpleSetter);
+  task->SelectCollisionCandidates(AliVEvent::kAny);
   
   // Event selection
-  // filter bit
-  task->SelectCollisionCandidates(AliVEvent::kINT7);
-  
   AliAnalysisNanoAODEventCuts* evtCuts = new AliAnalysisNanoAODEventCuts;
-  evtCuts->SetVertexRange(8);
-  evtCuts->SetCutPileUpMV(kTRUE);
+  // NOTE filter bit set in AliEventCuts automatically
 
   // Track selection
   AliAnalysisNanoAODTrackCuts* trkCuts = new AliAnalysisNanoAODTrackCuts;
@@ -55,7 +51,7 @@ void filterESD_V0s()
   task->SetVarListTrack("pt,theta,phi");
 
   task->SetTrkCuts(trkCuts);
-  task->SetEvtCuts(evtCuts);
+  task->AddEvtCuts(evtCuts);
 
   // V0s
   task->SaveV0s(kTRUE, new AliAnalysisNanoAODV0Cuts);

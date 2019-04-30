@@ -56,6 +56,7 @@ set(SRCS
   AliFemtoEventReaderESDChain.cxx
   AliFemtoEventReaderESDChainKine.cxx
   AliFemtoEventReaderESDChainKineKK.cxx
+  AliFemtoEventReaderAlt.cxx
   AliFemtoModelHiddenInfo.cxx
   AliFemtoModelGlobalHiddenInfo.cxx
   AliFemtoModelGausLCMSFreezeOutGenerator.cxx
@@ -69,6 +70,7 @@ set(SRCS
   AliFemtoCutMonitorParticleVertPos.cxx
   AliFemtoCutMonitorParticlePID.cxx
   AliFemtoCutMonitorParticlePIDBeta.cxx
+  AliFemtoCutMonitorParticlePIDInnerMomentum.cxx
   AliFemtoCutMonitorEventMult.cxx
   AliFemtoCutMonitorEventVertex.cxx
   AliFemtoKTPairCut.cxx
@@ -77,7 +79,6 @@ set(SRCS
   AliFemtoEventReaderAOD.cxx
   AliFemtoEventReaderAODChain.cxx
   AliFemtoEventReaderAODMultSelection.cxx
-  AliFemtoEventReaderAlt.cxx
   AliFemtoAODTrackCut.cxx
   AliFemtoCutMonitor.cxx
   AliFemtoCorrFctn.cxx

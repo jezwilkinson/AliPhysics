@@ -337,6 +337,20 @@ void AliReducedEventInfo::ClearEvent() {
 }
 
 //_______________________________________________________________________________
+AliReducedCaloClusterInfo* AliReducedEventInfo::GetCaloClusterFromID(Int_t clusterID) const {
+  //
+  // get calorimeter cluster from ID
+  //
+  TIter nextCluster(fCaloClusters);
+  AliReducedCaloClusterInfo* cluster = NULL;
+  for (Int_t i=0; i<fCaloClusters->GetEntries(); ++i) {
+    cluster = (AliReducedCaloClusterInfo*)nextCluster();
+    if (clusterID==cluster->ClusterID()) return cluster;
+  }
+  return NULL;
+}
+
+//_______________________________________________________________________________
 void AliReducedEventInfo::GetQvector(Double_t Qvec[][2], Int_t det,
                                  Float_t etaMin/*=-0.8*/, Float_t etaMax/*=+0.8*/,
 				 Bool_t (*IsTrackSelected)(AliReducedTrackInfo*)/*=NULL*/) {

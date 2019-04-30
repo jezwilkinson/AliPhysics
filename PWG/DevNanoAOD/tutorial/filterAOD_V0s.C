@@ -14,12 +14,8 @@ void filterAOD_V0s()
   task->AddSetter(new AliNanoAODSimpleSetter);
   
   // Event selection
-  // filter bit
-  task->SelectCollisionCandidates(AliVEvent::kINT7);
-  
   AliAnalysisNanoAODEventCuts* evtCuts = new AliAnalysisNanoAODEventCuts;
-  evtCuts->SetVertexRange(8);
-  evtCuts->SetCutPileUpMV(kTRUE);
+  // NOTE filter bit set in AliEventCuts automatically
 
   // Track selection
   AliAnalysisNanoAODTrackCuts* trkCuts = new AliAnalysisNanoAODTrackCuts;
@@ -35,11 +31,11 @@ void filterAOD_V0s()
   task->SetVarListTrack("pt,theta,phi");
 
   task->SetTrkCuts(trkCuts);
-  task->SetEvtCuts(evtCuts);
+  task->AddEvtCuts(evtCuts);
   
   // V0s
   task->SaveV0s(kTRUE, new AliAnalysisNanoAODV0Cuts);
-  task->SaveCascades(kTRUE);
+  task->SaveCascades(kTRUE, new AliAnalysisNanoAODCascadeCuts);
 
   mgr->SetDebugLevel(1); // enable debug printouts
   if (!mgr->InitAnalysis()) 
