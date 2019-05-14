@@ -22,6 +22,7 @@
 
 #include "AliVertex.h"
 #include "AliVVertex.h"
+#include "AliVEventHandler.h"
 #include "AliESDVertex.h"
 #include "AliESDEvent.h"
 #include "AliVertexerTracks.h"
@@ -37,7 +38,10 @@
 #include "AliAnalysisVertexingHF.h"
 #include "AliNeutralTrackParam.h"
 #include "AliAnalysisTaskSEImproveITS.h"
+#include "AliDataFile.h"
+#include "AliAnalysisManager.h"
 #include "AliVertexingHFUtils.h"
+
 //
 // Implementation of the "hybrid-approach" for ITS upgrade studies.
 // The tastk smears the track parameters according to estimations
@@ -222,7 +226,10 @@ AliAnalysisTaskSEImproveITS::AliAnalysisTaskSEImproveITS()
    fDebugOutput (0),
    fDebugNtuple (0),
    fDebugVars   (0), 
-   fNDebug      (0)
+   fNDebug      (0),
+   fImproverSuffix(0),
+   fOverridePeriodName(0),
+   fFilesOpen(kFALSE)
 {
   //
   // Default constructor.
@@ -441,7 +448,10 @@ AliAnalysisTaskSEImproveITS::AliAnalysisTaskSEImproveITS(const char *name,
    fDebugOutput (0),
    fDebugNtuple (0),
    fDebugVars   (0),
-   fNDebug      (ndebug)
+   fNDebug      (ndebug),
+   fImproverSuffix(0),
+   fOverridePeriodName(0),
+   fFilesOpen(kFALSE)
 {
   //
   // Constructor to be used to create the task.
@@ -451,6 +461,9 @@ AliAnalysisTaskSEImproveITS::AliAnalysisTaskSEImproveITS(const char *name,
   // One may also specify for how many tracks debug information
   // is written to the output.
   //
+  fImproverSuffix = systematic;
+  fOverridePeriodName = period;
+  
   for(Int_t jh=0; jh<2; jh++){
     // templates of mean (original)
     for(Int_t ih=0; ih<4; ih++){
@@ -485,477 +498,7 @@ AliAnalysisTaskSEImproveITS::AliAnalysisTaskSEImproveITS(const char *name,
     }
   }
   
-  TString resfileCurURI = Form("alien:///alice/cern.ch/user/p/pwg_hf/common/Improver/%s/%s/ITSgraphs_Current.root",period,systematic);
-  TString resfileUpgURI = Form("alien:///alice/cern.ch/user/p/pwg_hf/common/Improver/%s/%s/ITSgraphs_NewAll-X0.3-Res4um.root",period,systematic);
 
-  printf("\n### reading file %s ...\n",resfileCurURI.Data());
-  TFile *resfileCur=TFile::Open(resfileCurURI.Data());
-  if(resfileCur)  printf("... READ ###\n");
-  if( (resfileCurURI.Contains("LHC18r") || resfileCurURI.Contains("LHC18q")) && 
-      (resfileUpgURI.Contains("LHC18r") || resfileUpgURI.Contains("LHC18q")))     fIsPbPb2018=kTRUE; 
-  printf("\n\n===\n=== fIsPbPb2018: %s\n===\n\n",fIsPbPb2018?"kTRUE":"kFALSE");
-  if(resfileCur) {
-    if(!fIsPbPb2018){    
-      if(resfileCur->Get("D0RPResP" )) {
-        fD0RPResPCur =(TGraph*)(resfileCur->Get("D0RPResP" )->Clone("D0RPResPCur" ));
-      }
-      if(resfileCur->Get("D0RPResK" )) {
-        fD0RPResKCur =(TGraph*)(resfileCur->Get("D0RPResK" )->Clone("D0RPResKCur" ));
-      }
-      if(resfileCur->Get("D0RPResPi")) {
-        fD0RPResPiCur=(TGraph*)(resfileCur->Get("D0RPResPi")->Clone("D0RPResPiCur"));
-      }
-      if(resfileCur->Get("D0RPResE")) {
-        fD0RPResECur=(TGraph*)(resfileCur->Get("D0RPResE")->Clone("D0RPResECur"));
-      }
-      if(resfileCur->Get("D0RPSigmaPullRatioP" )) {
-        fD0RPSigmaPullRatioP =(TGraph*)(resfileCur->Get("D0RPSigmaPullRatioP" ));
-      }
-      if(resfileCur->Get("D0RPSigmaPullRatioK" )) {
-        fD0RPSigmaPullRatioK =(TGraph*)(resfileCur->Get("D0RPSigmaPullRatioK" ));
-      }
-      if(resfileCur->Get("D0RPSigmaPullRatioPi")) {
-        fD0RPSigmaPullRatioPi=(TGraph*)(resfileCur->Get("D0RPSigmaPullRatioPi"));
-      }
-      if(resfileCur->Get("D0RPSigmaPullRatioE")) {
-        fD0RPSigmaPullRatioE=(TGraph*)(resfileCur->Get("D0RPSigmaPullRatioE"));
-      }
-      for(Int_t j=0; j<2; j++){
-        for(Int_t i=0; i<4; i++){
-	        if(resfileCur->Get(Form("D0RPMeanP_B%d_phi%d",j,i))) {
-	          fD0RPMeanPCur[j][i]=(TGraph*)(resfileCur->Get(Form("D0RPMeanP_B%d_phi%d",j,i))->Clone(Form("D0RPMeanPCur_B%d_phi%d",j,i)));
-	        }
-	        if(resfileCur->Get(Form("D0RPMeanK_B%d_phi%d",j,i))) {
-	          fD0RPMeanKCur[j][i]=(TGraph*)(resfileCur->Get(Form("D0RPMeanK_B%d_phi%d",j,i))->Clone(Form("D0RPMeanKCur_B%d_phi%d",j,i)));
-	        }
-	        if(resfileCur->Get(Form("D0RPMeanPi_B%d_phi%d",j,i))) {
-	          fD0RPMeanPiCur[j][i]=(TGraph*)(resfileCur->Get(Form("D0RPMeanPi_B%d_phi%d",j,i))->Clone(Form("D0RPMeanPiCur_B%d_phi%d",j,i)));
-	        }
-	        if(resfileCur->Get(Form("D0RPMeanE_B%d_phi%d",j,i))) {
-	          fD0RPMeanECur[j][i]=(TGraph*)(resfileCur->Get(Form("D0RPMeanE_B%d_phi%d",j,i))->Clone(Form("D0RPMeanECur_B%d_phi%d",j,i)));
-	        }
-        }
-      }
-      if(resfileCur->Get("D0ZResP"  )) {
-        fD0ZResPCur  =(TGraph*)(resfileCur->Get("D0ZResP"  )->Clone("D0ZResPCur"  ));
-      }
-      if(resfileCur->Get("D0ZResK"  )) {
-        fD0ZResKCur  =(TGraph*)(resfileCur->Get("D0ZResK"  )->Clone("D0ZResKCur"  ));
-      }
-      if(resfileCur->Get("D0ZResPi" )) {
-        fD0ZResPiCur =(TGraph*)(resfileCur->Get("D0ZResPi" )->Clone("D0ZResPiCur" ));
-      }
-      if(resfileCur->Get("D0ZResE" )) {
-        fD0ZResECur =(TGraph*)(resfileCur->Get("D0ZResE" )->Clone("D0ZResECur" ));
-      }
-      if(resfileCur->Get("Pt1ResP"  )) {
-        fPt1ResPCur  =(TGraph*)(resfileCur->Get("Pt1ResP"  )->Clone("Pt1ResPCur"  ));
-      }
-      if(resfileCur->Get("Pt1ResK"  )) {
-        fPt1ResKCur  =(TGraph*)(resfileCur->Get("Pt1ResK"  )->Clone("Pt1ResKCur"  ));
-      }
-      if(resfileCur->Get("Pt1ResPi" )) {
-        fPt1ResPiCur =(TGraph*)(resfileCur->Get("Pt1ResPi" )->Clone("Pt1ResPiCur" ));
-      }
-      if(resfileCur->Get("Pt1ResE" )) {
-        fPt1ResECur =(TGraph*)(resfileCur->Get("Pt1ResE" )->Clone("Pt1ResECur" ));
-      }
-      if(resfileCur->Get("D0RPResPSA" )) {
-        fD0RPResPCurSA =(TGraph*)(resfileCur->Get("D0RPResPSA" )->Clone("D0RPResPCurSA" ));
-      }
-      if(resfileCur->Get("D0RPResKSA" )) {
-        fD0RPResKCurSA =(TGraph*)(resfileCur->Get("D0RPResKSA" )->Clone("D0RPResKCurSA" ));
-      }
-      if(resfileCur->Get("D0RPResPiSA")) {
-        fD0RPResPiCurSA=(TGraph*)(resfileCur->Get("D0RPResPiSA")->Clone("D0RPResPiCurSA"));
-      }
-      if(resfileCur->Get("D0RPResESA")) {
-        fD0RPResECurSA=(TGraph*)(resfileCur->Get("D0RPResESA")->Clone("D0RPResECurSA"));
-      }
-      if(resfileCur->Get("D0ZResPSA"  )) {
-        fD0ZResPCurSA  =(TGraph*)(resfileCur->Get("D0ZResPSA"  )->Clone("D0ZResPCurSA"  ));
-      }
-      if(resfileCur->Get("D0ZResKSA"  )) {
-        fD0ZResKCurSA  =(TGraph*)(resfileCur->Get("D0ZResKSA"  )->Clone("D0ZResKCurSA"  ));
-      }
-      if(resfileCur->Get("D0ZResPiSA" )) {
-        fD0ZResPiCurSA =(TGraph*)(resfileCur->Get("D0ZResPiSA" )->Clone("D0ZResPiCurSA" ));
-      }
-      if(resfileCur->Get("D0ZResESA" )) {
-        fD0ZResECurSA =(TGraph*)(resfileCur->Get("D0ZResESA" )->Clone("D0ZResECurSA" ));
-      }
-      if(resfileCur->Get("Pt1ResPSA"  )) {
-        fPt1ResPCurSA  =(TGraph*)(resfileCur->Get("Pt1ResPSA"  )->Clone("Pt1ResPCurSA"  ));
-      }
-      if(resfileCur->Get("Pt1ResKSA"  )) {
-        fPt1ResKCurSA  =(TGraph*)(resfileCur->Get("Pt1ResKSA"  )->Clone("Pt1ResKCurSA"  ));
-      }
-      if(resfileCur->Get("Pt1ResPiSA" )) {
-        fPt1ResPiCurSA =(TGraph*)(resfileCur->Get("Pt1ResPiSA" )->Clone("Pt1ResPiCurSA" ));
-      }
-      if(resfileCur->Get("Pt1ResESA" )) {
-        fPt1ResECurSA =(TGraph*)(resfileCur->Get("Pt1ResESA" )->Clone("Pt1ResECurSA" ));
-      }
-      delete resfileCur;
-    }
-    else  // analysing PbPb 2018 periods
-    {
-      if(resfileCur->Get("kFirst_D0RPResP") && resfileCur->Get("kOnlySecond_D0RPResP")){
-        fD0RPResPCur_PbPb2018_kFirst=(TGraph*)(resfileCur->Get("kFirst_D0RPResP")->Clone("kFirst_D0RPResPCur"));
-        fD0RPResPCur_PbPb2018_kOnlySecond=(TGraph*)(resfileCur->Get("kOnlySecond_D0RPResP")->Clone("kOnlySecond_D0RPResPCur"));
-      }
-      if(resfileCur->Get("kFirst_D0RPResK") && resfileCur->Get("kOnlySecond_D0RPResK")){
-        fD0RPResKCur_PbPb2018_kFirst=(TGraph*)(resfileCur->Get("kFirst_D0RPResK")->Clone("kFirst_D0RPResKCur"));
-        fD0RPResKCur_PbPb2018_kOnlySecond=(TGraph*)(resfileCur->Get("kOnlySecond_D0RPResK")->Clone("kOnlySecond_D0RPResKCur"));
-      }
-      if(resfileCur->Get("kFirst_D0RPResPi") && resfileCur->Get("kOnlySecond_D0RPResPi")){
-        fD0RPResPiCur_PbPb2018_kFirst=(TGraph*)(resfileCur->Get("kFirst_D0RPResPi")->Clone("kFirst_D0RPResPiCur"));
-        fD0RPResPiCur_PbPb2018_kOnlySecond=(TGraph*)(resfileCur->Get("kOnlySecond_D0RPResPi")->Clone("kOnlySecond_D0RPResPiCur"));
-      }
-      if(resfileCur->Get("kFirst_D0RPResE") && resfileCur->Get("kOnlySecond_D0RPResE")){
-        fD0RPResECur_PbPb2018_kFirst=(TGraph*)(resfileCur->Get("kFirst_D0RPResE")->Clone("kFirst_D0RPResECur"));
-        fD0RPResECur_PbPb2018_kOnlySecond=(TGraph*)(resfileCur->Get("kOnlySecond_D0RPResE")->Clone("kOnlySecond_D0RPResECur"));
-      }
-      if(resfileCur->Get("kFirst_D0RPSigmaPullRatioP") && resfileCur->Get("kOnlySecond_D0RPSigmaPullRatioP")){
-        fD0RPSigmaPullRatioP_PbPb2018_kFirst=(TGraph*)(resfileCur->Get("kFirst_D0RPSigmaPullRatioP"));
-        fD0RPSigmaPullRatioP_PbPb2018_kOnlySecond=(TGraph*)(resfileCur->Get("kOnlySecond_D0RPSigmaPullRatioP"));
-      }
-      if(resfileCur->Get("kFirst_D0RPSigmaPullRatioK") && resfileCur->Get("kOnlySecond_D0RPSigmaPullRatioK")){
-        fD0RPSigmaPullRatioK_PbPb2018_kFirst=(TGraph*)(resfileCur->Get("kFirst_D0RPSigmaPullRatioK"));
-        fD0RPSigmaPullRatioK_PbPb2018_kOnlySecond=(TGraph*)(resfileCur->Get("kOnlySecond_D0RPSigmaPullRatioK"));
-      }
-      if(resfileCur->Get("kFirst_D0RPSigmaPullRatioPi") && resfileCur->Get("kOnlySecond_D0RPSigmaPullRatioPi")){
-        fD0RPSigmaPullRatioPi_PbPb2018_kFirst=(TGraph*)(resfileCur->Get("kFirst_D0RPSigmaPullRatioPi"));
-        fD0RPSigmaPullRatioPi_PbPb2018_kOnlySecond=(TGraph*)(resfileCur->Get("kOnlySecond_D0RPSigmaPullRatioPi"));
-      }
-      if(resfileCur->Get("kFirst_D0RPSigmaPullRatioE") && resfileCur->Get("kOnlySecond_D0RPSigmaPullRatioE")){
-        fD0RPSigmaPullRatioE_PbPb2018_kFirst=(TGraph*)(resfileCur->Get("kFirst_D0RPSigmaPullRatioE"));
-        fD0RPSigmaPullRatioE_PbPb2018_kOnlySecond=(TGraph*)(resfileCur->Get("kOnlySecond_D0RPSigmaPullRatioE"));
-      }
-      for(UInt_t j = 0; j < 2; j++)
-      {
-        for(Int_t i=0; i<24; i++){
-          if(resfileCur->Get(Form("kFirst_D0RPMeanP_B%d_phi%d",j,i)) && resfileCur->Get(Form("kOnlySecond_D0RPMeanP_B%d_phi%d",j,i))){
-            fD0RPMeanPCur_PbPb2018_kFirst[j][i]=(TGraph*)resfileCur->Get(Form("kFirst_D0RPMeanP_B%d_phi%d",j,i))->Clone(Form("kFirst_D0RPMeanPCur_B%d_phi%d",j,i));
-            fD0RPMeanPCur_PbPb2018_kOnlySecond[j][i]=(TGraph*)resfileCur->Get(Form("kOnlySecond_D0RPMeanP_B%d_phi%d",j,i))->Clone(Form("kOnlySecond_D0RPMeanPCur_B%d_phi%d",j,i));
-          }
-          if(resfileCur->Get(Form("kFirst_D0RPMeanK_B%d_phi%d",j,i)) && resfileCur->Get(Form("kOnlySecond_D0RPMeanK_B%d_phi%d",j,i))){
-            fD0RPMeanKCur_PbPb2018_kFirst[j][i]=(TGraph*)resfileCur->Get(Form("kFirst_D0RPMeanK_B%d_phi%d",j,i))->Clone(Form("kFirst_D0RPMeanKCur_B%d_phi%d",j,i));
-            fD0RPMeanKCur_PbPb2018_kOnlySecond[j][i]=(TGraph*)resfileCur->Get(Form("kOnlySecond_D0RPMeanK_B%d_phi%d",j,i))->Clone(Form("kOnlySecond_D0RPMeanKCur_B%d_phi%d",j,i));
-          }
-          if(resfileCur->Get(Form("kFirst_D0RPMeanPi_B%d_phi%d",j,i)) && resfileCur->Get(Form("kOnlySecond_D0RPMeanPi_B%d_phi%d",j,i))){
-            fD0RPMeanPiCur_PbPb2018_kFirst[j][i]=(TGraph*)resfileCur->Get(Form("kFirst_D0RPMeanPi_B%d_phi%d",j,i))->Clone(Form("kFirst_D0RPMeanPiCur_B%d_phi%d",j,i));
-            fD0RPMeanPiCur_PbPb2018_kOnlySecond[j][i]=(TGraph*)resfileCur->Get(Form("kOnlySecond_D0RPMeanPi_B%d_phi%d",j,i))->Clone(Form("kOnlySecond_D0RPMeanPiCur_B%d_phi%d",j,i));
-          }      
-          if(resfileCur->Get(Form("kFirst_D0RPMeanE_B%d_phi%d",j,i)) && resfileCur->Get(Form("kOnlySecond_D0RPMeanE_B%d_phi%d",j,i))){
-            fD0RPMeanECur_PbPb2018_kFirst[j][i]=(TGraph*)resfileCur->Get(Form("kFirst_D0RPMeanE_B%d_phi%d",j,i))->Clone(Form("kFirst_D0RPMeanECur_B%d_phi%d",j,i));
-            fD0RPMeanECur_PbPb2018_kOnlySecond[j][i]=(TGraph*)resfileCur->Get(Form("kOnlySecond_D0RPMeanE_B%d_phi%d",j,i))->Clone(Form("kOnlySecond_D0RPMeanECur_B%d_phi%d",j,i));
-          }    
-        }
-      }
-      if(resfileCur->Get("kFirst_D0ZResP") && resfileCur->Get("kOnlySecond_D0ZResP")){
-        fD0ZResPCur_PbPb2018_kFirst=(TGraph*)(resfileCur->Get("kFirst_D0ZResP")->Clone("kFirst_D0ZResPCur"));
-        fD0ZResPCur_PbPb2018_kOnlySecond=(TGraph*)(resfileCur->Get("kOnlySecond_D0ZResP")->Clone("kOnlySecond_D0ZResPCur"));
-      }
-      if(resfileCur->Get("kFirst_D0ZResK") && resfileCur->Get("kOnlySecond_D0ZResK")){
-        fD0ZResKCur_PbPb2018_kFirst=(TGraph*)(resfileCur->Get("kFirst_D0ZResK")->Clone("kFirst_D0ZResKCur"));
-        fD0ZResKCur_PbPb2018_kOnlySecond=(TGraph*)(resfileCur->Get("kOnlySecond_D0ZResK")->Clone("kOnlySecond_D0ZResKCur"));
-      }
-      if(resfileCur->Get("kFirst_D0ZResPi") && resfileCur->Get("kOnlySecond_D0ZResPi")){
-        fD0ZResPiCur_PbPb2018_kFirst=(TGraph*)(resfileCur->Get("kFirst_D0ZResPi")->Clone("kFirst_D0ZResPiCur"));
-        fD0ZResPiCur_PbPb2018_kOnlySecond=(TGraph*)(resfileCur->Get("kOnlySecond_D0ZResPi")->Clone("kOnlySecond_D0ZResPiCur"));
-      }
-      if(resfileCur->Get("kFirst_D0ZResE") && resfileCur->Get("kOnlySecond_D0ZResE")){
-        fD0ZResECur_PbPb2018_kFirst=(TGraph*)(resfileCur->Get("kFirst_D0ZResE")->Clone("kFirst_D0ZResECur"));
-        fD0ZResECur_PbPb2018_kOnlySecond=(TGraph*)(resfileCur->Get("kOnlySecond_D0ZResE")->Clone("kOnlySecond_D0ZResECur"));
-      }
-      if(resfileCur->Get("kFirst_Pt1ResP") && resfileCur->Get("kOnlySecond_Pt1ResP")){
-        fPt1ResPCur_PbPb2018_kFirst=(TGraph*)(resfileCur->Get("kFirst_Pt1ResP")->Clone("kFirst_Pt1ResPCur"));
-        fPt1ResPCur_PbPb2018_kOnlySecond=(TGraph*)(resfileCur->Get("kOnlySecond_Pt1ResP")->Clone("kOnlySecond_Pt1ResPCur"));
-      }
-      if(resfileCur->Get("kFirst_Pt1ResK") && resfileCur->Get("kOnlySecond_Pt1ResK")){
-        fPt1ResKCur_PbPb2018_kFirst=(TGraph*)(resfileCur->Get("kFirst_Pt1ResK")->Clone("kFirst_Pt1ResKCur"));
-        fPt1ResKCur_PbPb2018_kOnlySecond=(TGraph*)(resfileCur->Get("kOnlySecond_Pt1ResK")->Clone("kOnlySecond_Pt1ResKCur"));
-      }
-      if(resfileCur->Get("kFirst_Pt1ResPi") && resfileCur->Get("kOnlySecond_Pt1ResPi")){
-        fPt1ResPiCur_PbPb2018_kFirst=(TGraph*)(resfileCur->Get("kFirst_Pt1ResPi")->Clone("kFirst_Pt1ResPiCur"));
-        fPt1ResPiCur_PbPb2018_kOnlySecond=(TGraph*)(resfileCur->Get("kOnlySecond_Pt1ResPi")->Clone("kOnlySecond_Pt1ResPiCur"));
-      }
-      if(resfileCur->Get("kFirst_Pt1ResE") && resfileCur->Get("kOnlySecond_Pt1ResE")){
-        fPt1ResECur_PbPb2018_kFirst=(TGraph*)(resfileCur->Get("kFirst_Pt1ResE")->Clone("kFirst_Pt1ResECur"));
-        fPt1ResECur_PbPb2018_kOnlySecond=(TGraph*)(resfileCur->Get("kOnlySecond_Pt1ResE")->Clone("kOnlySecond_Pt1ResECur"));
-      }
-      if(resfileCur->Get("kFirst_D0RPResPSA") && resfileCur->Get("kOnlySecond_D0RPResPSA")){
-        fD0RPResPCurSA_PbPb2018_kFirst=(TGraph*)(resfileCur->Get("kFirst_D0RPResPSA")->Clone("kFirst_D0RPResPCurSA"));
-        fD0RPResPCurSA_PbPb2018_kOnlySecond=(TGraph*)(resfileCur->Get("kOnlySecond_D0RPResPSA")->Clone("kOnlySecond_D0RPResPCurSA"));
-      }
-      if(resfileCur->Get("kFirst_D0RPResKSA") && resfileCur->Get("kOnlySecond_D0RKResPSA")){
-        fD0RPResKCurSA_PbPb2018_kFirst=(TGraph*)(resfileCur->Get("kFirst_D0RPResKSA")->Clone("kFirst_D0RPResKCurSA"));
-        fD0RPResKCurSA_PbPb2018_kOnlySecond=(TGraph*)(resfileCur->Get("kOnlySecond_D0RPResKSA")->Clone("kOnlySecond_D0RPResKCurSA"));
-      }
-      if(resfileCur->Get("kFirst_D0RPResPiSA") && resfileCur->Get("kOnlySecond_D0RPResPiSA")){
-        fD0RPResPiCurSA_PbPb2018_kFirst=(TGraph*)(resfileCur->Get("kFirst_D0RPResPiSA")->Clone("kFirst_D0RPResPiCurSA"));
-        fD0RPResPiCurSA_PbPb2018_kOnlySecond=(TGraph*)(resfileCur->Get("kOnlySecond_D0RPResPiSA")->Clone("kOnlySecond_D0RPResPiCurSA"));
-      }
-      if(resfileCur->Get("kFirst_D0RPResESA") && resfileCur->Get("kOnlySecond_D0RPResESA")){
-        fD0RPResECurSA_PbPb2018_kFirst=(TGraph*)(resfileCur->Get("kFirst_D0RPResESA")->Clone("kFirst_D0RPResECurSA"));
-        fD0RPResECurSA_PbPb2018_kOnlySecond=(TGraph*)(resfileCur->Get("kOnlySecond_D0RPResESA")->Clone("kOnlySecond_D0RPResECurSA"));
-      }
-      if(resfileCur->Get("kFirst_D0ZResPSA") && resfileCur->Get("kOnlySecond_D0ZResPSA")){
-        fD0ZResPCurSA_PbPb2018_kFirst=(TGraph*)(resfileCur->Get("kFirst_D0ZResPSA")->Clone("kFirst_D0ZResPCurSA"));
-        fD0ZResPCurSA_PbPb2018_kOnlySecond=(TGraph*)(resfileCur->Get("kOnlySecond_D0ZResPSA")->Clone("kOnlySecond_D0ZResPCurSA"));
-      }
-      if(resfileCur->Get("kFirst_D0ZResKSA") && resfileCur->Get("kOnlySecond_D0ZResKSA")){
-        fD0ZResKCurSA_PbPb2018_kFirst=(TGraph*)(resfileCur->Get("kFirst_D0ZResKSA")->Clone("kFirst_D0ZResKCurSA"));
-        fD0ZResKCurSA_PbPb2018_kOnlySecond=(TGraph*)(resfileCur->Get("kOnlySecond_D0ZResKSA")->Clone("kOnlySecond_D0ZResKCurSA"));
-      }
-      if(resfileCur->Get("kFirst_D0ZResPiSA") && resfileCur->Get("kOnlySecond_D0ZResPiSA")){
-        fD0ZResPiCurSA_PbPb2018_kFirst=(TGraph*)(resfileCur->Get("kFirst_D0ZResPiSA")->Clone("kFirst_D0ZResPiCurSA"));
-        fD0ZResPiCurSA_PbPb2018_kOnlySecond=(TGraph*)(resfileCur->Get("kOnlySecond_D0ZResPiSA")->Clone("kOnlySecond_D0ZResPiCurSA"));
-      }
-      if(resfileCur->Get("kFirst_D0ZResESA") && resfileCur->Get("kOnlySecond_D0ZResESA")){
-        fD0ZResECurSA_PbPb2018_kFirst=(TGraph*)(resfileCur->Get("kFirst_D0ZResESA")->Clone("kFirst_D0ZResECurSA"));
-        fD0ZResECurSA_PbPb2018_kOnlySecond=(TGraph*)(resfileCur->Get("kOnlySecond_D0ZResESA")->Clone("kOnlySecond_D0ZResECurSA"));
-      }
-      if(resfileCur->Get("kFirst_Pt1ResPSA") && resfileCur->Get("kOnlySecond_Pt1ResPSA")){
-        fPt1ResPCurSA_PbPb2018_kFirst=(TGraph*) (resfileCur->Get("kFirst_Pt1ResPSA")->Clone("kFirst_Pt1ResPCurSA"));
-        fPt1ResPCurSA_PbPb2018_kOnlySecond=(TGraph*) (resfileCur->Get("kOnlySecond_Pt1ResPSA")->Clone("kOnlySecond_Pt1ResPCurSA"));
-      }
-      if(resfileCur->Get("kFirst_Pt1ResKSA") && resfileCur->Get("kOnlySecond_Pt1ResKSA")){
-        fPt1ResKCurSA_PbPb2018_kFirst=(TGraph*) (resfileCur->Get("kFirst_Pt1ResKSA")->Clone("kFirst_Pt1ResKCurSA"));
-        fPt1ResKCurSA_PbPb2018_kOnlySecond=(TGraph*) (resfileCur->Get("kOnlySecond_Pt1ResKSA")->Clone("kOnlySecond_Pt1ResKCurSA"));
-      }
-      if(resfileCur->Get("kFirst_Pt1ResPiSA") && resfileCur->Get("kOnlySecond_Pt1ResPiSA")){
-        fPt1ResPiCurSA_PbPb2018_kFirst=(TGraph*) (resfileCur->Get("kFirst_Pt1ResPiSA")->Clone("kFirst_Pt1ResPiCurSA"));
-        fPt1ResPiCurSA_PbPb2018_kOnlySecond=(TGraph*) (resfileCur->Get("kOnlySecond_Pt1ResPiSA")->Clone("kOnlySecond_Pt1ResPiCurSA"));
-      }
-      if(resfileCur->Get("kFirst_Pt1ResESA") && resfileCur->Get("kOnlySecond_Pt1ResESA")){
-        fPt1ResECurSA_PbPb2018_kFirst=(TGraph*) (resfileCur->Get("kFirst_Pt1ResESA")->Clone("kFirst_Pt1ResECurSA"));
-        fPt1ResECurSA_PbPb2018_kOnlySecond=(TGraph*) (resfileCur->Get("kOnlySecond_Pt1ResESA")->Clone("kOnlySecond_Pt1ResECurSA"));
-      }
-      delete resfileCur;
-    }    
-  }
-    
-  //TString resfileUpgURI = Form("alien:///alice/cern.ch/user/p/pwg_hf/common/Improver/%s/%s/ITSgraphs_NewAll-X0.3-Res4um.root",period,systematic);
-  printf("\n### reading file %s ...\n",resfileUpgURI.Data());
-  TFile *resfileUpg=TFile::Open(resfileUpgURI.Data());
-  if(resfileUpg)  printf("... READ ###\n");
-  if(resfileUpg) {
-    if(!fIsPbPb2018){ 
-      if(resfileUpg->Get("D0RPResP" )) {
-        fD0RPResPUpg =(TGraph*)(resfileUpg->Get("D0RPResP" )->Clone("D0RPResPUpg" ));
-      }
-      if(resfileUpg->Get("D0RPResK" )) {
-        fD0RPResKUpg =(TGraph*)(resfileUpg->Get("D0RPResK" )->Clone("D0RPResKUpg" ));
-      }
-      if(resfileUpg->Get("D0RPResPi")) {
-        fD0RPResPiUpg=(TGraph*)(resfileUpg->Get("D0RPResPi")->Clone("D0RPResPiUpg"));
-      }
-      if(resfileUpg->Get("D0RPResE")) {
-        fD0RPResEUpg=(TGraph*)(resfileUpg->Get("D0RPResE")->Clone("D0RPResEUpg"));
-      }
-      for(Int_t j=0; j<2; j++){
-        for(Int_t i=0; i<4; i++){
-	        if(resfileUpg->Get(Form("D0RPMeanP_B%d_phi%d",j,i))) {
-	          fD0RPMeanPUpg[j][i]=(TGraph*)(resfileUpg->Get(Form("D0RPMeanP_B%d_phi%d",j,i))->Clone(Form("D0RPMeanPUpg_B%d_phi%d",j,i)));
-	        }
-	        if(resfileUpg->Get(Form("D0RPMeanK_B%d_phi%d",j,i))) {
-	          fD0RPMeanKUpg[j][i]=(TGraph*)(resfileUpg->Get(Form("D0RPMeanK_B%d_phi%d",j,i))->Clone(Form("D0RPMeanKUpg_B%d_phi%d",j,i)));
-	        }
-	        if(resfileUpg->Get(Form("D0RPMeanPi_B%d_phi%d",j,i))) {
-	          fD0RPMeanPiUpg[j][i]=(TGraph*)(resfileUpg->Get(Form("D0RPMeanPi_B%d_phi%d",j,i))->Clone(Form("D0RPMeanPiUpg_B%d_phi%d",j,i)));
-	        }
-	        if(resfileUpg->Get(Form("D0RPMeanE_B%d_phi%d",j,i))) {
-	          fD0RPMeanEUpg[j][i]=(TGraph*)(resfileUpg->Get(Form("D0RPMeanE_B%d_phi%d",j,i))->Clone(Form("D0RPMeanEUpg_B%d_phi%d",j,i)));
-	        }
-        }
-      }
-      if(resfileUpg->Get("D0ZResP"  )) {
-        fD0ZResPUpg  =(TGraph*)(resfileUpg->Get("D0ZResP"  )->Clone("D0ZResPUpg"  ));
-      }
-      if(resfileUpg->Get("D0ZResK"  )) {
-        fD0ZResKUpg  =(TGraph*)(resfileUpg->Get("D0ZResK"  )->Clone("D0ZResKUpg"  ));
-      }
-      if(resfileUpg->Get("D0ZResPi" )) {
-        fD0ZResPiUpg =(TGraph*)(resfileUpg->Get("D0ZResPi" )->Clone("D0ZResPiUpg" ));
-      }
-      if(resfileUpg->Get("D0ZResE" )) {
-        fD0ZResEUpg =(TGraph*)(resfileUpg->Get("D0ZResE" )->Clone("D0ZResEUpg" ));
-      }
-      if(resfileUpg->Get("Pt1ResP"  )) {
-        fPt1ResPUpg  =(TGraph*)(resfileUpg->Get("Pt1ResP"  )->Clone("Pt1ResPUpg"  ));
-      }
-      if(resfileUpg->Get("Pt1ResK"  )) {
-        fPt1ResKUpg  =(TGraph*)(resfileUpg->Get("Pt1ResK"  )->Clone("Pt1ResKUpg"  ));
-      }
-      if(resfileUpg->Get("Pt1ResPi" )) {
-        fPt1ResPiUpg =(TGraph*)(resfileUpg->Get("Pt1ResPi" )->Clone("Pt1ResPiUpg" ));
-      }
-      if(resfileUpg->Get("Pt1ResE" )) {
-        fPt1ResEUpg =(TGraph*)(resfileUpg->Get("Pt1ResE" )->Clone("Pt1ResEUpg" ));
-      }
-      if(resfileUpg->Get("D0RPResPSA" )) {
-        fD0RPResPUpgSA =(TGraph*)(resfileUpg->Get("D0RPResPSA" )->Clone("D0RPResPUpgSA" ));
-      }
-      if(resfileUpg->Get("D0RPResKSA" )) {
-        fD0RPResKUpgSA =(TGraph*)(resfileUpg->Get("D0RPResKSA" )->Clone("D0RPResKUpgSA" ));
-      }
-      if(resfileUpg->Get("D0RPResPiSA")) {
-        fD0RPResPiUpgSA=(TGraph*)(resfileUpg->Get("D0RPResPiSA")->Clone("D0RPResPiUpgSA"));
-      }
-      if(resfileUpg->Get("D0RPResESA")) {
-        fD0RPResEUpgSA=(TGraph*)(resfileUpg->Get("D0RPResESA")->Clone("D0RPResEUpgSA"));
-      }
-      if(resfileUpg->Get("D0ZResPSA"  )) {
-        fD0ZResPUpgSA  =(TGraph*)(resfileUpg->Get("D0ZResPSA"  )->Clone("D0ZResPUpgSA"  ));
-      }
-      if(resfileUpg->Get("D0ZResKSA"  )) {
-        fD0ZResKUpgSA  =(TGraph*)(resfileUpg->Get("D0ZResKSA"  )->Clone("D0ZResKUpgSA"  ));
-      }
-      if(resfileUpg->Get("D0ZResPiSA" )) {
-        fD0ZResPiUpgSA =(TGraph*)(resfileUpg->Get("D0ZResPiSA" )->Clone("D0ZResPiUpgSA" ));
-      }
-      if(resfileUpg->Get("D0ZResESA" )) {
-        fD0ZResEUpgSA =(TGraph*)(resfileUpg->Get("D0ZResESA" )->Clone("D0ZResEUpgSA" ));
-      }
-      if(resfileUpg->Get("Pt1ResPSA"  )) {
-        fPt1ResPUpgSA  =(TGraph*)(resfileUpg->Get("Pt1ResPSA"  )->Clone("Pt1ResPUpgSA"  ));
-      }
-      if(resfileUpg->Get("Pt1ResKSA"  )) {
-        fPt1ResKUpgSA  =(TGraph*)(resfileUpg->Get("Pt1ResKSA"  )->Clone("Pt1ResKUpgSA"  ));
-      }
-      if(resfileUpg->Get("Pt1ResPiSA" )) {
-        fPt1ResPiUpgSA =(TGraph*)(resfileUpg->Get("Pt1ResPiSA" )->Clone("Pt1ResPiUpgSA" ));
-      }
-      if(resfileUpg->Get("Pt1ResESA" )) {
-        fPt1ResEUpgSA =(TGraph*)(resfileUpg->Get("Pt1ResESA" )->Clone("Pt1ResEUpgSA" ));
-      }
-      delete resfileUpg;
-    }
-    else  // analysing PbPb 2018 periods
-    {
-      if(resfileUpg->Get("kFirst_D0RPResP") && resfileUpg->Get("kOnlySecond_D0RPResP")){
-        fD0RPResPUpg_PbPb2018_kFirst=(TGraph*)(resfileUpg->Get("kFirst_D0RPResP")->Clone("kFirst_D0RPResPUpg"));
-        fD0RPResPUpg_PbPb2018_kOnlySecond=(TGraph*)(resfileUpg->Get("kOnlySecond_D0RPResP")->Clone("kOnlySecond_D0RPResPUpg"));
-      }
-      if(resfileUpg->Get("kFirst_D0RPResK") && resfileUpg->Get("kOnlySecond_D0RPResK")){
-        fD0RPResKUpg_PbPb2018_kFirst=(TGraph*)(resfileUpg->Get("kFirst_D0RPResK")->Clone("kFirst_D0RPResKUpg"));
-        fD0RPResKUpg_PbPb2018_kOnlySecond=(TGraph*)(resfileUpg->Get("kOnlySecond_D0RPResK")->Clone("kOnlySecond_D0RPResKUpg"));
-      }
-      if(resfileUpg->Get("kFirst_D0RPResPi") && resfileUpg->Get("kOnlySecond_D0RPResPi")){
-        fD0RPResPiUpg_PbPb2018_kFirst=(TGraph*)(resfileUpg->Get("kFirst_D0RPResPi")->Clone("kFirst_D0RPResPiUpg"));
-        fD0RPResPiUpg_PbPb2018_kOnlySecond=(TGraph*)(resfileUpg->Get("kOnlySecond_D0RPResPi")->Clone("kOnlySecond_D0RPResPiUpg"));
-      }
-      if(resfileUpg->Get("kFirst_D0RPResE") && resfileUpg->Get("kOnlySecond_D0RPResE")){
-        fD0RPResEUpg_PbPb2018_kFirst=(TGraph*)(resfileUpg->Get("kFirst_D0RPResE")->Clone("kFirst_D0RPResEUpg"));
-        fD0RPResEUpg_PbPb2018_kOnlySecond=(TGraph*)(resfileUpg->Get("kOnlySecond_D0RPResE")->Clone("kOnlySecond_D0RPResEUpg"));
-      }
-      for(UInt_t j = 0; j < 2; j++){
-        for(UInt_t i = 0; i < 24; i++){
-          if(resfileUpg->Get(Form("kFirst_D0RPMeanP_B%d_phi%d",j,i)) && resfileUpg->Get(Form("kOnlySecond_D0RPMeanP_B%d_phi%d",j,i))){
-            fD0RPMeanPUpg_PbPb2018_kFirst[j][i]=(TGraph*)(resfileUpg->Get(Form("kFirst_D0RPMeanP_B%d_phi%d",j,i))->Clone(Form("kFirst_D0RPMeanP_B%d_phi%d",j,i)));
-            fD0RPMeanPUpg_PbPb2018_kOnlySecond[j][i]=(TGraph*)(resfileUpg->Get(Form("kOnlySecond_D0RPMeanP_B%d_phi%d",j,i))->Clone(Form("kOnlySecond_D0RPMeanP_B%d_phi%d",j,i)));          
-          }
-          if(resfileUpg->Get(Form("kFirst_D0RPMeanK_B%d_phi%d",j,i)) && resfileUpg->Get(Form("kOnlySecond_D0RPMeanK_B%d_phi%d",j,i))){
-            fD0RPMeanKUpg_PbPb2018_kFirst[j][i]=(TGraph*)(resfileUpg->Get(Form("kFirst_D0RPMeanK_B%d_phi%d",j,i))->Clone(Form("kFirst_D0RPMeanK_B%d_phi%d",j,i)));
-            fD0RPMeanKUpg_PbPb2018_kOnlySecond[j][i]=(TGraph*)(resfileUpg->Get(Form("kOnlySecond_D0RPMeanK_B%d_phi%d",j,i))->Clone(Form("kOnlySecond_D0RPMeanK_B%d_phi%d",j,i)));          
-          }
-          if(resfileUpg->Get(Form("kFirst_D0RPMeanPi_B%d_phi%d",j,i)) && resfileUpg->Get(Form("kOnlySecond_D0RPMeanPi_B%d_phi%d",j,i))){
-            fD0RPMeanPiUpg_PbPb2018_kFirst[j][i]=(TGraph*)(resfileUpg->Get(Form("kFirst_D0RPMeanPi_B%d_phi%d",j,i))->Clone(Form("kFirst_D0RPMeanPi_B%d_phi%d",j,i)));
-            fD0RPMeanPiUpg_PbPb2018_kOnlySecond[j][i]=(TGraph*)(resfileUpg->Get(Form("kOnlySecond_D0RPMeanPi_B%d_phi%d",j,i))->Clone(Form("kOnlySecond_D0RPMeanPi_B%d_phi%d",j,i)));          
-          }
-          if(resfileUpg->Get(Form("kFirst_D0RPMeanE_B%d_phi%d",j,i)) && resfileUpg->Get(Form("kOnlySecond_D0RPMeanE_B%d_phi%d",j,i))){
-            fD0RPMeanEUpg_PbPb2018_kFirst[j][i]=(TGraph*)(resfileUpg->Get(Form("kFirst_D0RPMeanE_B%d_phi%d",j,i))->Clone(Form("kFirst_D0RPMeanE_B%d_phi%d",j,i)));
-            fD0RPMeanEUpg_PbPb2018_kOnlySecond[j][i]=(TGraph*)(resfileUpg->Get(Form("kOnlySecond_D0RPMeanE_B%d_phi%d",j,i))->Clone(Form("kOnlySecond_D0RPMeanE_B%d_phi%d",j,i)));          
-          }
-        } 
-      }
-      if(resfileUpg->Get("kFirst_D0ZResP") && resfileUpg->Get("kOnlySecond_D0ZResP")){
-        fD0ZResPUpg_PbPb2018_kFirst=(TGraph*)(resfileUpg->Get("kFirst_D0ZResP")->Clone("kFirst_D0ZResPUpg"));
-        fD0ZResPUpg_PbPb2018_kOnlySecond=(TGraph*)(resfileUpg->Get("kOnlySecond_D0ZResP")->Clone("kOnlySecond_D0ZResPUpg"));
-      }
-      if(resfileUpg->Get("kFirst_D0ZResK") && resfileUpg->Get("kOnlySecond_D0ZResK")){
-        fD0ZResKUpg_PbPb2018_kFirst=(TGraph*)(resfileUpg->Get("kFirst_D0ZResK")->Clone("kFirst_D0ZResKUpg"));
-        fD0ZResKUpg_PbPb2018_kOnlySecond=(TGraph*)(resfileUpg->Get("kOnlySecond_D0ZResK")->Clone("kOnlySecond_D0ZResKUpg"));
-      }
-      if(resfileUpg->Get("kFirst_D0ZResPi") && resfileUpg->Get("kOnlySecond_D0ZResPi")){
-        fD0ZResPiUpg_PbPb2018_kFirst=(TGraph*)(resfileUpg->Get("kFirst_D0ZResPi")->Clone("kFirst_D0ZResPiUpg"));
-        fD0ZResPiUpg_PbPb2018_kOnlySecond=(TGraph*)(resfileUpg->Get("kOnlySecond_D0ZResPi")->Clone("kOnlySecond_D0ZResPiUpg"));
-      }
-      if(resfileUpg->Get("kFirst_D0ZResE") && resfileUpg->Get("kOnlySecond_D0ZResE")){
-        fD0ZResEUpg_PbPb2018_kFirst=(TGraph*)(resfileUpg->Get("kFirst_D0ZResE")->Clone("kFirst_D0ZResEUpg"));
-        fD0ZResEUpg_PbPb2018_kOnlySecond=(TGraph*)(resfileUpg->Get("kOnlySecond_D0ZResE")->Clone("kOnlySecond_D0ZResEUpg"));
-      }
-      if(resfileUpg->Get("kFirst_Pt1ResP") && resfileUpg->Get("kOnlySecond_Pt1ResP")){
-        fPt1ResPUpg_PbPb2018_kFirst=(TGraph*) (resfileUpg->Get("kFirst_Pt1ResP")->Clone("kFirst_Pt1ResPUpg"));
-        fPt1ResPUpg_PbPb2018_kOnlySecond=(TGraph*) (resfileUpg->Get("kOnlySecond_Pt1ResP")->Clone("kOnlySecond_Pt1ResPUpg"));
-      }
-      if(resfileUpg->Get("kFirst_Pt1ResK") && resfileUpg->Get("kOnlySecond_Pt1ResK")){
-        fPt1ResKUpg_PbPb2018_kFirst=(TGraph*) (resfileUpg->Get("kFirst_Pt1ResK")->Clone("kFirst_Pt1ResKUpg"));
-        fPt1ResKUpg_PbPb2018_kOnlySecond=(TGraph*) (resfileUpg->Get("kOnlySecond_Pt1ResK")->Clone("kOnlySecond_Pt1ResKUpg"));
-      }
-      if(resfileUpg->Get("kFirst_Pt1ResPi") && resfileUpg->Get("kOnlySecond_Pt1ResPi")){
-        fPt1ResPiUpg_PbPb2018_kFirst=(TGraph*) (resfileUpg->Get("kFirst_Pt1ResPi")->Clone("kFirst_Pt1ResPiUpg"));
-        fPt1ResPiUpg_PbPb2018_kOnlySecond=(TGraph*) (resfileUpg->Get("kOnlySecond_Pt1ResPi")->Clone("kOnlySecond_Pt1ResPiUpg"));
-      }
-      if(resfileUpg->Get("kFirst_Pt1ResE") && resfileUpg->Get("kOnlySecond_Pt1ResE")){
-        fPt1ResEUpg_PbPb2018_kFirst=(TGraph*) (resfileUpg->Get("kFirst_Pt1ResE")->Clone("kFirst_Pt1ResEUpg"));
-        fPt1ResEUpg_PbPb2018_kOnlySecond=(TGraph*) (resfileUpg->Get("kOnlySecond_Pt1ResE")->Clone("kOnlySecond_Pt1ResEUpg"));
-      }
-      if(resfileUpg->Get("kFirst_D0RPResPSA") && resfileUpg->Get("kOnlySecond_D0RPResPSA")){
-        fD0RPResPUpgSA_PbPb2018_kFirst=(TGraph*) (resfileUpg->Get("kFirst_D0RPResPSA")->Clone("kFirst_D0RPResPUpgSA"));
-        fD0RPResPUpgSA_PbPb2018_kOnlySecond=(TGraph*) (resfileUpg->Get("kOnlySecond_D0RPResPSA")->Clone("kOnlySecond_D0RPResPUpgSA"));
-      }
-      if(resfileUpg->Get("kFirst_D0RPResKSA") && resfileUpg->Get("kOnlySecond_D0RPResKSA")){
-        fD0RPResKUpgSA_PbPb2018_kFirst=(TGraph*) (resfileUpg->Get("kFirst_D0RPResKSA")->Clone("kFirst_D0RPResKUpgSA"));
-        fD0RPResKUpgSA_PbPb2018_kOnlySecond=(TGraph*) (resfileUpg->Get("kOnlySecond_D0RPResKSA")->Clone("kOnlySecond_D0RPResKUpgSA"));
-      }
-      if(resfileUpg->Get("kFirst_D0RPResPiSA") && resfileUpg->Get("kOnlySecond_D0RPResPiSA")){
-        fD0RPResPiUpgSA_PbPb2018_kFirst=(TGraph*) (resfileUpg->Get("kFirst_D0RPResPiSA")->Clone("kFirst_D0RPResPiUpgSA"));
-        fD0RPResPiUpgSA_PbPb2018_kOnlySecond=(TGraph*) (resfileUpg->Get("kOnlySecond_D0RPResPiSA")->Clone("kOnlySecond_D0RPResPiUpgSA"));
-      }
-      if(resfileUpg->Get("kFirst_D0RPResESA") && resfileUpg->Get("kOnlySecond_D0RPResESA")){
-        fD0RPResEUpgSA_PbPb2018_kFirst=(TGraph*) (resfileUpg->Get("kFirst_D0RPResESA")->Clone("kFirst_D0RPResEUpgSA"));
-        fD0RPResEUpgSA_PbPb2018_kOnlySecond=(TGraph*) (resfileUpg->Get("kOnlySecond_D0RPResESA")->Clone("kOnlySecond_D0RPResEUpgSA"));
-      }
-      if(resfileUpg->Get("kFirst_D0ZResPSA") && resfileUpg->Get("kOnlyFirst_D0ZResPSA")){
-        fD0ZResPUpgSA_PbPb2018_kFirst=(TGraph*) (resfileUpg->Get("kFirst_D0ZResPSA")->Clone("kFirst_D0ZResPUpgSA"));
-        fD0ZResPUpgSA_PbPb2018_kOnlySecond=(TGraph*) (resfileUpg->Get("kOnlySecond_D0ZResPSA")->Clone("kOnlySecond_D0ZResPUpgSA"));
-      }
-      if(resfileUpg->Get("kFirst_D0ZResKSA") && resfileUpg->Get("kOnlyFirst_D0ZResKSA")){
-        fD0ZResKUpgSA_PbPb2018_kFirst=(TGraph*) (resfileUpg->Get("kFirst_D0ZResKSA")->Clone("kFirst_D0ZResKUpgSA"));
-        fD0ZResKUpgSA_PbPb2018_kOnlySecond=(TGraph*) (resfileUpg->Get("kOnlySecond_D0ZResKSA")->Clone("kOnlySecond_D0ZResKUpgSA"));
-      }
-      if(resfileUpg->Get("kFirst_D0ZResPiSA") && resfileUpg->Get("kOnlyFirst_D0ZResPiSA")){
-        fD0ZResPiUpgSA_PbPb2018_kFirst=(TGraph*) (resfileUpg->Get("kFirst_D0ZResPiSA")->Clone("kFirst_D0ZResPiUpgSA"));
-        fD0ZResPiUpgSA_PbPb2018_kOnlySecond=(TGraph*) (resfileUpg->Get("kOnlySecond_D0ZResPiSA")->Clone("kOnlySecond_D0ZResPiUpgSA"));
-      }
-      if(resfileUpg->Get("kFirst_D0ZResESA") && resfileUpg->Get("kOnlyFirst_D0ZResESA")){
-        fD0ZResEUpgSA_PbPb2018_kFirst=(TGraph*) (resfileUpg->Get("kFirst_D0ZResESA")->Clone("kFirst_D0ZResEUpgSA"));
-        fD0ZResEUpgSA_PbPb2018_kOnlySecond=(TGraph*) (resfileUpg->Get("kOnlySecond_D0ZResESA")->Clone("kOnlySecond_D0ZResEUpgSA"));
-      }
-      if(resfileUpg->Get("kFirst_Pt1ResPSA") && resfileUpg->Get("kOnlySecond_Pt1ResPSA")){
-        fPt1ResPUpgSA_PbPb2018_kFirst=(TGraph*) (resfileUpg->Get("kFirst_Pt1ResPSA")->Clone("kFirst_Pt1ResPUpgSA"));
-        fPt1ResPUpgSA_PbPb2018_kOnlySecond=(TGraph*) (resfileUpg->Get("kOnlySecond_Pt1ResPSA")->Clone("kOnlySecond_Pt1ResPUpgSA"));
-      }
-      if(resfileUpg->Get("kFirst_Pt1ResKSA") && resfileUpg->Get("kOnlySecond_Pt1ResKSA")){
-        fPt1ResKUpgSA_PbPb2018_kFirst=(TGraph*) (resfileUpg->Get("kFirst_Pt1ResKSA")->Clone("kFirst_Pt1ResKUpgSA"));
-        fPt1ResKUpgSA_PbPb2018_kOnlySecond=(TGraph*) (resfileUpg->Get("kOnlySecond_Pt1ResKSA")->Clone("kOnlySecond_Pt1ResKUpgSA"));
-      }
-      if(resfileUpg->Get("kFirst_Pt1ResPiSA") && resfileUpg->Get("kOnlySecond_Pt1ResPiSA")){
-        fPt1ResPiUpgSA_PbPb2018_kFirst=(TGraph*) (resfileUpg->Get("kFirst_Pt1ResPiSA")->Clone("kFirst_Pt1ResPiUpgSA"));
-        fPt1ResPiUpgSA_PbPb2018_kOnlySecond=(TGraph*) (resfileUpg->Get("kOnlySecond_Pt1ResPiSA")->Clone("kOnlySecond_Pt1ResPiUpgSA"));
-      }
-      if(resfileUpg->Get("kFirst_Pt1ResESA") && resfileUpg->Get("kOnlySecond_Pt1ResESA")){
-        fPt1ResEUpgSA_PbPb2018_kFirst=(TGraph*) (resfileUpg->Get("kFirst_Pt1ResESA")->Clone("kFirst_Pt1ResEUpgSA"));
-        fPt1ResEUpgSA_PbPb2018_kOnlySecond=(TGraph*) (resfileUpg->Get("kOnlySecond_Pt1ResESA")->Clone("kOnlySecond_Pt1ResEUpgSA"));
-      }
-      delete resfileUpg;
-    }
-  
-  }
-    
   DefineOutput(1,TList::Class());
 }
 
@@ -1171,6 +714,10 @@ void AliAnalysisTaskSEImproveITS::UserExec(Option_t*) {
     }  
     if(!ev) return;
     bz=ev->GetMagneticField();
+    if (!fFilesOpen) {	// check (run-once) that files have been opened
+    OpenImproverHistos(ev);
+    if (!fFilesOpen) AliFatal("Error in opening improver files !");
+   }
   }
   else {
     evesd = dynamic_cast<AliESDEvent*>(InputEvent());
@@ -1179,6 +726,10 @@ void AliAnalysisTaskSEImproveITS::UserExec(Option_t*) {
       return;
     }
     bz=evesd->GetMagneticField();
+    if (!fFilesOpen) {	// check (run-once) that files have been opened
+    OpenImproverHistos(evesd);
+    if (!fFilesOpen) AliFatal("Error in opening improver files !");
+   }
   }
 
   if(fIsAOD) {
@@ -1888,6 +1439,555 @@ Int_t AliAnalysisTaskSEImproveITS::PhiBin(Double_t phi) const {
   }
   
   return -1;
+}
+
+void AliAnalysisTaskSEImproveITS::OpenImproverHistos(AliVEvent* event) {
+   Int_t run = event->GetRunNumber();
+ 
+   TString lProductionName = "";
+   if (!fOverridePeriodName.EqualTo("")) { lProductionName = fOverridePeriodName; } // manual period name if present
+   else { //otherwise determine period name automatically
+   TString currentfilename = ((AliAnalysisManager::GetAnalysisManager()->GetInputEventHandler()->GetTree()->GetCurrentFile()))->GetName();
+    //2016
+    if ( run >= 252235 && run <= 252375 ) lProductionName = "LHC16d";
+    if ( run >= 252603 && run <= 253591 ) lProductionName = "LHC16e";
+    if ( run >= 254124 && run <= 254332 ) lProductionName = "LHC16g";
+    if ( run >= 254378 && run <= 255467 ) lProductionName = "LHC16h";
+    if ( run >= 256146 && run <= 256420 ) lProductionName = "LHC16j";
+    if ( run >= 256504 && run <= 258537 ) lProductionName = "LHC16k";
+    if ( run >= 258883 && run <= 260187 ) lProductionName = "LHC16l";
+    if ( run >= 262395 && run <= 264035 ) lProductionName = "LHC16o";
+    if ( run >= 264076 && run <= 264347 ) lProductionName = "LHC16p";
+    
+    //2017
+    if ( run >= 270822 && run <= 270830 ) lProductionName = "LHC17e";
+    if ( run >= 270854 && run <= 270865 ) lProductionName = "LHC17f";
+    if ( run >= 270882 && run <= 271777 ) lProductionName = "LHC17g";
+    if ( run >= 271868 && run <= 273103 ) lProductionName = "LHC17h";
+    if ( run >= 273591 && run <= 274442 ) lProductionName = "LHC17i";
+    if ( run >= 274593 && run <= 274671 ) lProductionName = "LHC17j";
+    if ( run >= 274690 && run <= 276508 ) lProductionName = "LHC17k";
+    if ( run >= 276551 && run <= 278216 ) lProductionName = "LHC17l";
+    if ( run >= 278914 && run <= 280140 ) lProductionName = "LHC17m";
+    if ( run >= 280282 && run <= 281961 ) lProductionName = "LHC17o";
+    if ( run >= 282504 && run <= 282704 ) lProductionName = "LHC17r";
+
+   //2018
+    if ( run >= 285008 && run <= 285447 ) lProductionName = "LHC18b";
+    if ( run >= 285466 && run <= 285958 ) lProductionName = "LHC18c_CENT";
+    if ( run >= 285978 && run <= 286350 ) lProductionName = "LHC18d";
+    if ( run >= 286380 && run <= 286937 ) lProductionName = "LHC18e";
+    if ( run >= 287000 && run <= 287977 ) lProductionName = "LHC18f";
+    if ( run >= 288619 && run <= 288750 ) lProductionName = "LHC18g";
+    if ( run >= 288804 && run <= 288806 ) lProductionName = "LHC18h";
+    if ( run >= 288861 && run <= 288909 ) lProductionName = "LHC18i";
+    if ( run >= 288943 && run <= 288943 ) lProductionName = "LHC18j";
+    if ( run >= 289165 && run <= 289201 ) lProductionName = "LHC18k";   
+
+
+    //2017: LHC17pq
+ 
+    if ( (run >= 282008 && run <= 282343) || (run >= 282365 && run <= 282367) ) { //check trigger cluster CENT or FAST
+	if (currentfilename.Contains("cent")) lProductionName = "LHC17pq_cent";
+	if (currentfilename.Contains("fast")) lProductionName = "LCH17pq_fast";
+}
+
+    //Registered Productions : Run 2 Pb-Pb
+    if ( run >= 244917 && run <= 246994 ) lProductionName = "LHC15o";
+    
+    //Registered Productions : Run 2 p-Pb
+    if ( (run >= 265115 && run <= 265525) || (run >=267161 && run <= 267166) ) lProductionName = "LHC16qt";
+     
+    //Registered production: Run 2 Pb-Pb 2018 [to be uncommented when improver files avaiable]
+    if ( run >= 295581 && run <= 296689 ) { lProductionName = "LHC18q"; fIsPbPb2018 = kTRUE; }
+    if ( run >= 296690 && run <= 300000 ) { lProductionName = "LHC18r"; fIsPbPb2018 = kTRUE; }
+}
+
+  if (lProductionName.EqualTo("")) {
+   AliWarning("This run number has no corresponding improver file!");
+   return;
+  }  
+  if (fImproverSuffix.EqualTo("")) fImproverSuffix = "central"; // default path is "central"
+
+
+  TString pathToFileCurrent = AliDataFile::GetFileName(Form("PWGHF/common/Improver/%s/%s/ITSgraphs_Current.root",lProductionName.Data(),fImproverSuffix.Data()));  // find URI for improver file from CVMFS
+  
+  // Check access to CVMFS (will only be displayed locally)
+  if (pathToFileCurrent.IsNull()) {
+	AliFatal("Cannot access data files from CVMFS: please export ALICE_DATA=root://eospublic.cern.ch//eos/experiment/alice/analysis-data and run again");
+}
+
+  TFile *resfileCur=TFile::Open(pathToFileCurrent.Data());
+  if(resfileCur)  printf("... READ ###\n");
+
+  printf("\n\n===\n=== fIsPbPb2018: %s\n===\n\n",fIsPbPb2018?"kTRUE":"kFALSE");
+  if(resfileCur) {
+    if(!fIsPbPb2018){    
+      if(resfileCur->Get("D0RPResP" )) {
+        fD0RPResPCur =(TGraph*)(resfileCur->Get("D0RPResP" )->Clone("D0RPResPCur" ));
+      }
+      if(resfileCur->Get("D0RPResK" )) {
+        fD0RPResKCur =(TGraph*)(resfileCur->Get("D0RPResK" )->Clone("D0RPResKCur" ));
+      }
+      if(resfileCur->Get("D0RPResPi")) {
+        fD0RPResPiCur=(TGraph*)(resfileCur->Get("D0RPResPi")->Clone("D0RPResPiCur"));
+      }
+      if(resfileCur->Get("D0RPResE")) {
+        fD0RPResECur=(TGraph*)(resfileCur->Get("D0RPResE")->Clone("D0RPResECur"));
+      }
+      if(resfileCur->Get("D0RPSigmaPullRatioP" )) {
+        fD0RPSigmaPullRatioP =(TGraph*)(resfileCur->Get("D0RPSigmaPullRatioP" ));
+      }
+      if(resfileCur->Get("D0RPSigmaPullRatioK" )) {
+        fD0RPSigmaPullRatioK =(TGraph*)(resfileCur->Get("D0RPSigmaPullRatioK" ));
+      }
+      if(resfileCur->Get("D0RPSigmaPullRatioPi")) {
+        fD0RPSigmaPullRatioPi=(TGraph*)(resfileCur->Get("D0RPSigmaPullRatioPi"));
+      }
+      if(resfileCur->Get("D0RPSigmaPullRatioE")) {
+        fD0RPSigmaPullRatioE=(TGraph*)(resfileCur->Get("D0RPSigmaPullRatioE"));
+      }
+      for(Int_t j=0; j<2; j++){
+        for(Int_t i=0; i<4; i++){
+	        if(resfileCur->Get(Form("D0RPMeanP_B%d_phi%d",j,i))) {
+	          fD0RPMeanPCur[j][i]=(TGraph*)(resfileCur->Get(Form("D0RPMeanP_B%d_phi%d",j,i))->Clone(Form("D0RPMeanPCur_B%d_phi%d",j,i)));
+	        }
+	        if(resfileCur->Get(Form("D0RPMeanK_B%d_phi%d",j,i))) {
+	          fD0RPMeanKCur[j][i]=(TGraph*)(resfileCur->Get(Form("D0RPMeanK_B%d_phi%d",j,i))->Clone(Form("D0RPMeanKCur_B%d_phi%d",j,i)));
+	        }
+	        if(resfileCur->Get(Form("D0RPMeanPi_B%d_phi%d",j,i))) {
+	          fD0RPMeanPiCur[j][i]=(TGraph*)(resfileCur->Get(Form("D0RPMeanPi_B%d_phi%d",j,i))->Clone(Form("D0RPMeanPiCur_B%d_phi%d",j,i)));
+	        }
+	        if(resfileCur->Get(Form("D0RPMeanE_B%d_phi%d",j,i))) {
+	          fD0RPMeanECur[j][i]=(TGraph*)(resfileCur->Get(Form("D0RPMeanE_B%d_phi%d",j,i))->Clone(Form("D0RPMeanECur_B%d_phi%d",j,i)));
+	        }
+        }
+      }
+      if(resfileCur->Get("D0ZResP"  )) {
+        fD0ZResPCur  =(TGraph*)(resfileCur->Get("D0ZResP"  )->Clone("D0ZResPCur"  ));
+      }
+      if(resfileCur->Get("D0ZResK"  )) {
+        fD0ZResKCur  =(TGraph*)(resfileCur->Get("D0ZResK"  )->Clone("D0ZResKCur"  ));
+      }
+      if(resfileCur->Get("D0ZResPi" )) {
+        fD0ZResPiCur =(TGraph*)(resfileCur->Get("D0ZResPi" )->Clone("D0ZResPiCur" ));
+      }
+      if(resfileCur->Get("D0ZResE" )) {
+        fD0ZResECur =(TGraph*)(resfileCur->Get("D0ZResE" )->Clone("D0ZResECur" ));
+      }
+      if(resfileCur->Get("Pt1ResP"  )) {
+        fPt1ResPCur  =(TGraph*)(resfileCur->Get("Pt1ResP"  )->Clone("Pt1ResPCur"  ));
+      }
+      if(resfileCur->Get("Pt1ResK"  )) {
+        fPt1ResKCur  =(TGraph*)(resfileCur->Get("Pt1ResK"  )->Clone("Pt1ResKCur"  ));
+      }
+      if(resfileCur->Get("Pt1ResPi" )) {
+        fPt1ResPiCur =(TGraph*)(resfileCur->Get("Pt1ResPi" )->Clone("Pt1ResPiCur" ));
+      }
+      if(resfileCur->Get("Pt1ResE" )) {
+        fPt1ResECur =(TGraph*)(resfileCur->Get("Pt1ResE" )->Clone("Pt1ResECur" ));
+      }
+      if(resfileCur->Get("D0RPResPSA" )) {
+        fD0RPResPCurSA =(TGraph*)(resfileCur->Get("D0RPResPSA" )->Clone("D0RPResPCurSA" ));
+      }
+      if(resfileCur->Get("D0RPResKSA" )) {
+        fD0RPResKCurSA =(TGraph*)(resfileCur->Get("D0RPResKSA" )->Clone("D0RPResKCurSA" ));
+      }
+      if(resfileCur->Get("D0RPResPiSA")) {
+        fD0RPResPiCurSA=(TGraph*)(resfileCur->Get("D0RPResPiSA")->Clone("D0RPResPiCurSA"));
+      }
+      if(resfileCur->Get("D0RPResESA")) {
+        fD0RPResECurSA=(TGraph*)(resfileCur->Get("D0RPResESA")->Clone("D0RPResECurSA"));
+      }
+      if(resfileCur->Get("D0ZResPSA"  )) {
+        fD0ZResPCurSA  =(TGraph*)(resfileCur->Get("D0ZResPSA"  )->Clone("D0ZResPCurSA"  ));
+      }
+      if(resfileCur->Get("D0ZResKSA"  )) {
+        fD0ZResKCurSA  =(TGraph*)(resfileCur->Get("D0ZResKSA"  )->Clone("D0ZResKCurSA"  ));
+      }
+      if(resfileCur->Get("D0ZResPiSA" )) {
+        fD0ZResPiCurSA =(TGraph*)(resfileCur->Get("D0ZResPiSA" )->Clone("D0ZResPiCurSA" ));
+      }
+      if(resfileCur->Get("D0ZResESA" )) {
+        fD0ZResECurSA =(TGraph*)(resfileCur->Get("D0ZResESA" )->Clone("D0ZResECurSA" ));
+      }
+      if(resfileCur->Get("Pt1ResPSA"  )) {
+        fPt1ResPCurSA  =(TGraph*)(resfileCur->Get("Pt1ResPSA"  )->Clone("Pt1ResPCurSA"  ));
+      }
+      if(resfileCur->Get("Pt1ResKSA"  )) {
+        fPt1ResKCurSA  =(TGraph*)(resfileCur->Get("Pt1ResKSA"  )->Clone("Pt1ResKCurSA"  ));
+      }
+      if(resfileCur->Get("Pt1ResPiSA" )) {
+        fPt1ResPiCurSA =(TGraph*)(resfileCur->Get("Pt1ResPiSA" )->Clone("Pt1ResPiCurSA" ));
+      }
+      if(resfileCur->Get("Pt1ResESA" )) {
+        fPt1ResECurSA =(TGraph*)(resfileCur->Get("Pt1ResESA" )->Clone("Pt1ResECurSA" ));
+      }
+      delete resfileCur;
+    }
+    else  // analysing PbPb 2018 periods
+    {
+      if(resfileCur->Get("kFirst_D0RPResP") && resfileCur->Get("kOnlySecond_D0RPResP")){
+        fD0RPResPCur_PbPb2018_kFirst=(TGraph*)(resfileCur->Get("kFirst_D0RPResP")->Clone("kFirst_D0RPResPCur"));
+        fD0RPResPCur_PbPb2018_kOnlySecond=(TGraph*)(resfileCur->Get("kOnlySecond_D0RPResP")->Clone("kOnlySecond_D0RPResPCur"));
+      }
+      if(resfileCur->Get("kFirst_D0RPResK") && resfileCur->Get("kOnlySecond_D0RPResK")){
+        fD0RPResKCur_PbPb2018_kFirst=(TGraph*)(resfileCur->Get("kFirst_D0RPResK")->Clone("kFirst_D0RPResKCur"));
+        fD0RPResKCur_PbPb2018_kOnlySecond=(TGraph*)(resfileCur->Get("kOnlySecond_D0RPResK")->Clone("kOnlySecond_D0RPResKCur"));
+      }
+      if(resfileCur->Get("kFirst_D0RPResPi") && resfileCur->Get("kOnlySecond_D0RPResPi")){
+        fD0RPResPiCur_PbPb2018_kFirst=(TGraph*)(resfileCur->Get("kFirst_D0RPResPi")->Clone("kFirst_D0RPResPiCur"));
+        fD0RPResPiCur_PbPb2018_kOnlySecond=(TGraph*)(resfileCur->Get("kOnlySecond_D0RPResPi")->Clone("kOnlySecond_D0RPResPiCur"));
+      }
+      if(resfileCur->Get("kFirst_D0RPResE") && resfileCur->Get("kOnlySecond_D0RPResE")){
+        fD0RPResECur_PbPb2018_kFirst=(TGraph*)(resfileCur->Get("kFirst_D0RPResE")->Clone("kFirst_D0RPResECur"));
+        fD0RPResECur_PbPb2018_kOnlySecond=(TGraph*)(resfileCur->Get("kOnlySecond_D0RPResE")->Clone("kOnlySecond_D0RPResECur"));
+      }
+      if(resfileCur->Get("kFirst_D0RPSigmaPullRatioP") && resfileCur->Get("kOnlySecond_D0RPSigmaPullRatioP")){
+        fD0RPSigmaPullRatioP_PbPb2018_kFirst=(TGraph*)(resfileCur->Get("kFirst_D0RPSigmaPullRatioP"));
+        fD0RPSigmaPullRatioP_PbPb2018_kOnlySecond=(TGraph*)(resfileCur->Get("kOnlySecond_D0RPSigmaPullRatioP"));
+      }
+      if(resfileCur->Get("kFirst_D0RPSigmaPullRatioK") && resfileCur->Get("kOnlySecond_D0RPSigmaPullRatioK")){
+        fD0RPSigmaPullRatioK_PbPb2018_kFirst=(TGraph*)(resfileCur->Get("kFirst_D0RPSigmaPullRatioK"));
+        fD0RPSigmaPullRatioK_PbPb2018_kOnlySecond=(TGraph*)(resfileCur->Get("kOnlySecond_D0RPSigmaPullRatioK"));
+      }
+      if(resfileCur->Get("kFirst_D0RPSigmaPullRatioPi") && resfileCur->Get("kOnlySecond_D0RPSigmaPullRatioPi")){
+        fD0RPSigmaPullRatioPi_PbPb2018_kFirst=(TGraph*)(resfileCur->Get("kFirst_D0RPSigmaPullRatioPi"));
+        fD0RPSigmaPullRatioPi_PbPb2018_kOnlySecond=(TGraph*)(resfileCur->Get("kOnlySecond_D0RPSigmaPullRatioPi"));
+      }
+      if(resfileCur->Get("kFirst_D0RPSigmaPullRatioE") && resfileCur->Get("kOnlySecond_D0RPSigmaPullRatioE")){
+        fD0RPSigmaPullRatioE_PbPb2018_kFirst=(TGraph*)(resfileCur->Get("kFirst_D0RPSigmaPullRatioE"));
+        fD0RPSigmaPullRatioE_PbPb2018_kOnlySecond=(TGraph*)(resfileCur->Get("kOnlySecond_D0RPSigmaPullRatioE"));
+      }
+      for(UInt_t j = 0; j < 2; j++)
+      {
+        for(Int_t i=0; i<24; i++){
+          if(resfileCur->Get(Form("kFirst_D0RPMeanP_B%d_phi%d",j,i)) && resfileCur->Get(Form("kOnlySecond_D0RPMeanP_B%d_phi%d",j,i))){
+            fD0RPMeanPCur_PbPb2018_kFirst[j][i]=(TGraph*)resfileCur->Get(Form("kFirst_D0RPMeanP_B%d_phi%d",j,i))->Clone(Form("kFirst_D0RPMeanPCur_B%d_phi%d",j,i));
+            fD0RPMeanPCur_PbPb2018_kOnlySecond[j][i]=(TGraph*)resfileCur->Get(Form("kOnlySecond_D0RPMeanP_B%d_phi%d",j,i))->Clone(Form("kOnlySecond_D0RPMeanPCur_B%d_phi%d",j,i));
+          }
+          if(resfileCur->Get(Form("kFirst_D0RPMeanK_B%d_phi%d",j,i)) && resfileCur->Get(Form("kOnlySecond_D0RPMeanK_B%d_phi%d",j,i))){
+            fD0RPMeanKCur_PbPb2018_kFirst[j][i]=(TGraph*)resfileCur->Get(Form("kFirst_D0RPMeanK_B%d_phi%d",j,i))->Clone(Form("kFirst_D0RPMeanKCur_B%d_phi%d",j,i));
+            fD0RPMeanKCur_PbPb2018_kOnlySecond[j][i]=(TGraph*)resfileCur->Get(Form("kOnlySecond_D0RPMeanK_B%d_phi%d",j,i))->Clone(Form("kOnlySecond_D0RPMeanKCur_B%d_phi%d",j,i));
+          }
+          if(resfileCur->Get(Form("kFirst_D0RPMeanPi_B%d_phi%d",j,i)) && resfileCur->Get(Form("kOnlySecond_D0RPMeanPi_B%d_phi%d",j,i))){
+            fD0RPMeanPiCur_PbPb2018_kFirst[j][i]=(TGraph*)resfileCur->Get(Form("kFirst_D0RPMeanPi_B%d_phi%d",j,i))->Clone(Form("kFirst_D0RPMeanPiCur_B%d_phi%d",j,i));
+            fD0RPMeanPiCur_PbPb2018_kOnlySecond[j][i]=(TGraph*)resfileCur->Get(Form("kOnlySecond_D0RPMeanPi_B%d_phi%d",j,i))->Clone(Form("kOnlySecond_D0RPMeanPiCur_B%d_phi%d",j,i));
+          }      
+          if(resfileCur->Get(Form("kFirst_D0RPMeanE_B%d_phi%d",j,i)) && resfileCur->Get(Form("kOnlySecond_D0RPMeanE_B%d_phi%d",j,i))){
+            fD0RPMeanECur_PbPb2018_kFirst[j][i]=(TGraph*)resfileCur->Get(Form("kFirst_D0RPMeanE_B%d_phi%d",j,i))->Clone(Form("kFirst_D0RPMeanECur_B%d_phi%d",j,i));
+            fD0RPMeanECur_PbPb2018_kOnlySecond[j][i]=(TGraph*)resfileCur->Get(Form("kOnlySecond_D0RPMeanE_B%d_phi%d",j,i))->Clone(Form("kOnlySecond_D0RPMeanECur_B%d_phi%d",j,i));
+          }    
+        }
+      }
+      if(resfileCur->Get("kFirst_D0ZResP") && resfileCur->Get("kOnlySecond_D0ZResP")){
+        fD0ZResPCur_PbPb2018_kFirst=(TGraph*)(resfileCur->Get("kFirst_D0ZResP")->Clone("kFirst_D0ZResPCur"));
+        fD0ZResPCur_PbPb2018_kOnlySecond=(TGraph*)(resfileCur->Get("kOnlySecond_D0ZResP")->Clone("kOnlySecond_D0ZResPCur"));
+      }
+      if(resfileCur->Get("kFirst_D0ZResK") && resfileCur->Get("kOnlySecond_D0ZResK")){
+        fD0ZResKCur_PbPb2018_kFirst=(TGraph*)(resfileCur->Get("kFirst_D0ZResK")->Clone("kFirst_D0ZResKCur"));
+        fD0ZResKCur_PbPb2018_kOnlySecond=(TGraph*)(resfileCur->Get("kOnlySecond_D0ZResK")->Clone("kOnlySecond_D0ZResKCur"));
+      }
+      if(resfileCur->Get("kFirst_D0ZResPi") && resfileCur->Get("kOnlySecond_D0ZResPi")){
+        fD0ZResPiCur_PbPb2018_kFirst=(TGraph*)(resfileCur->Get("kFirst_D0ZResPi")->Clone("kFirst_D0ZResPiCur"));
+        fD0ZResPiCur_PbPb2018_kOnlySecond=(TGraph*)(resfileCur->Get("kOnlySecond_D0ZResPi")->Clone("kOnlySecond_D0ZResPiCur"));
+      }
+      if(resfileCur->Get("kFirst_D0ZResE") && resfileCur->Get("kOnlySecond_D0ZResE")){
+        fD0ZResECur_PbPb2018_kFirst=(TGraph*)(resfileCur->Get("kFirst_D0ZResE")->Clone("kFirst_D0ZResECur"));
+        fD0ZResECur_PbPb2018_kOnlySecond=(TGraph*)(resfileCur->Get("kOnlySecond_D0ZResE")->Clone("kOnlySecond_D0ZResECur"));
+      }
+      if(resfileCur->Get("kFirst_Pt1ResP") && resfileCur->Get("kOnlySecond_Pt1ResP")){
+        fPt1ResPCur_PbPb2018_kFirst=(TGraph*)(resfileCur->Get("kFirst_Pt1ResP")->Clone("kFirst_Pt1ResPCur"));
+        fPt1ResPCur_PbPb2018_kOnlySecond=(TGraph*)(resfileCur->Get("kOnlySecond_Pt1ResP")->Clone("kOnlySecond_Pt1ResPCur"));
+      }
+      if(resfileCur->Get("kFirst_Pt1ResK") && resfileCur->Get("kOnlySecond_Pt1ResK")){
+        fPt1ResKCur_PbPb2018_kFirst=(TGraph*)(resfileCur->Get("kFirst_Pt1ResK")->Clone("kFirst_Pt1ResKCur"));
+        fPt1ResKCur_PbPb2018_kOnlySecond=(TGraph*)(resfileCur->Get("kOnlySecond_Pt1ResK")->Clone("kOnlySecond_Pt1ResKCur"));
+      }
+      if(resfileCur->Get("kFirst_Pt1ResPi") && resfileCur->Get("kOnlySecond_Pt1ResPi")){
+        fPt1ResPiCur_PbPb2018_kFirst=(TGraph*)(resfileCur->Get("kFirst_Pt1ResPi")->Clone("kFirst_Pt1ResPiCur"));
+        fPt1ResPiCur_PbPb2018_kOnlySecond=(TGraph*)(resfileCur->Get("kOnlySecond_Pt1ResPi")->Clone("kOnlySecond_Pt1ResPiCur"));
+      }
+      if(resfileCur->Get("kFirst_Pt1ResE") && resfileCur->Get("kOnlySecond_Pt1ResE")){
+        fPt1ResECur_PbPb2018_kFirst=(TGraph*)(resfileCur->Get("kFirst_Pt1ResE")->Clone("kFirst_Pt1ResECur"));
+        fPt1ResECur_PbPb2018_kOnlySecond=(TGraph*)(resfileCur->Get("kOnlySecond_Pt1ResE")->Clone("kOnlySecond_Pt1ResECur"));
+      }
+      if(resfileCur->Get("kFirst_D0RPResPSA") && resfileCur->Get("kOnlySecond_D0RPResPSA")){
+        fD0RPResPCurSA_PbPb2018_kFirst=(TGraph*)(resfileCur->Get("kFirst_D0RPResPSA")->Clone("kFirst_D0RPResPCurSA"));
+        fD0RPResPCurSA_PbPb2018_kOnlySecond=(TGraph*)(resfileCur->Get("kOnlySecond_D0RPResPSA")->Clone("kOnlySecond_D0RPResPCurSA"));
+      }
+      if(resfileCur->Get("kFirst_D0RPResKSA") && resfileCur->Get("kOnlySecond_D0RKResPSA")){
+        fD0RPResKCurSA_PbPb2018_kFirst=(TGraph*)(resfileCur->Get("kFirst_D0RPResKSA")->Clone("kFirst_D0RPResKCurSA"));
+        fD0RPResKCurSA_PbPb2018_kOnlySecond=(TGraph*)(resfileCur->Get("kOnlySecond_D0RPResKSA")->Clone("kOnlySecond_D0RPResKCurSA"));
+      }
+      if(resfileCur->Get("kFirst_D0RPResPiSA") && resfileCur->Get("kOnlySecond_D0RPResPiSA")){
+        fD0RPResPiCurSA_PbPb2018_kFirst=(TGraph*)(resfileCur->Get("kFirst_D0RPResPiSA")->Clone("kFirst_D0RPResPiCurSA"));
+        fD0RPResPiCurSA_PbPb2018_kOnlySecond=(TGraph*)(resfileCur->Get("kOnlySecond_D0RPResPiSA")->Clone("kOnlySecond_D0RPResPiCurSA"));
+      }
+      if(resfileCur->Get("kFirst_D0RPResESA") && resfileCur->Get("kOnlySecond_D0RPResESA")){
+        fD0RPResECurSA_PbPb2018_kFirst=(TGraph*)(resfileCur->Get("kFirst_D0RPResESA")->Clone("kFirst_D0RPResECurSA"));
+        fD0RPResECurSA_PbPb2018_kOnlySecond=(TGraph*)(resfileCur->Get("kOnlySecond_D0RPResESA")->Clone("kOnlySecond_D0RPResECurSA"));
+      }
+      if(resfileCur->Get("kFirst_D0ZResPSA") && resfileCur->Get("kOnlySecond_D0ZResPSA")){
+        fD0ZResPCurSA_PbPb2018_kFirst=(TGraph*)(resfileCur->Get("kFirst_D0ZResPSA")->Clone("kFirst_D0ZResPCurSA"));
+        fD0ZResPCurSA_PbPb2018_kOnlySecond=(TGraph*)(resfileCur->Get("kOnlySecond_D0ZResPSA")->Clone("kOnlySecond_D0ZResPCurSA"));
+      }
+      if(resfileCur->Get("kFirst_D0ZResKSA") && resfileCur->Get("kOnlySecond_D0ZResKSA")){
+        fD0ZResKCurSA_PbPb2018_kFirst=(TGraph*)(resfileCur->Get("kFirst_D0ZResKSA")->Clone("kFirst_D0ZResKCurSA"));
+        fD0ZResKCurSA_PbPb2018_kOnlySecond=(TGraph*)(resfileCur->Get("kOnlySecond_D0ZResKSA")->Clone("kOnlySecond_D0ZResKCurSA"));
+      }
+      if(resfileCur->Get("kFirst_D0ZResPiSA") && resfileCur->Get("kOnlySecond_D0ZResPiSA")){
+        fD0ZResPiCurSA_PbPb2018_kFirst=(TGraph*)(resfileCur->Get("kFirst_D0ZResPiSA")->Clone("kFirst_D0ZResPiCurSA"));
+        fD0ZResPiCurSA_PbPb2018_kOnlySecond=(TGraph*)(resfileCur->Get("kOnlySecond_D0ZResPiSA")->Clone("kOnlySecond_D0ZResPiCurSA"));
+      }
+      if(resfileCur->Get("kFirst_D0ZResESA") && resfileCur->Get("kOnlySecond_D0ZResESA")){
+        fD0ZResECurSA_PbPb2018_kFirst=(TGraph*)(resfileCur->Get("kFirst_D0ZResESA")->Clone("kFirst_D0ZResECurSA"));
+        fD0ZResECurSA_PbPb2018_kOnlySecond=(TGraph*)(resfileCur->Get("kOnlySecond_D0ZResESA")->Clone("kOnlySecond_D0ZResECurSA"));
+      }
+      if(resfileCur->Get("kFirst_Pt1ResPSA") && resfileCur->Get("kOnlySecond_Pt1ResPSA")){
+        fPt1ResPCurSA_PbPb2018_kFirst=(TGraph*) (resfileCur->Get("kFirst_Pt1ResPSA")->Clone("kFirst_Pt1ResPCurSA"));
+        fPt1ResPCurSA_PbPb2018_kOnlySecond=(TGraph*) (resfileCur->Get("kOnlySecond_Pt1ResPSA")->Clone("kOnlySecond_Pt1ResPCurSA"));
+      }
+      if(resfileCur->Get("kFirst_Pt1ResKSA") && resfileCur->Get("kOnlySecond_Pt1ResKSA")){
+        fPt1ResKCurSA_PbPb2018_kFirst=(TGraph*) (resfileCur->Get("kFirst_Pt1ResKSA")->Clone("kFirst_Pt1ResKCurSA"));
+        fPt1ResKCurSA_PbPb2018_kOnlySecond=(TGraph*) (resfileCur->Get("kOnlySecond_Pt1ResKSA")->Clone("kOnlySecond_Pt1ResKCurSA"));
+      }
+      if(resfileCur->Get("kFirst_Pt1ResPiSA") && resfileCur->Get("kOnlySecond_Pt1ResPiSA")){
+        fPt1ResPiCurSA_PbPb2018_kFirst=(TGraph*) (resfileCur->Get("kFirst_Pt1ResPiSA")->Clone("kFirst_Pt1ResPiCurSA"));
+        fPt1ResPiCurSA_PbPb2018_kOnlySecond=(TGraph*) (resfileCur->Get("kOnlySecond_Pt1ResPiSA")->Clone("kOnlySecond_Pt1ResPiCurSA"));
+      }
+      if(resfileCur->Get("kFirst_Pt1ResESA") && resfileCur->Get("kOnlySecond_Pt1ResESA")){
+        fPt1ResECurSA_PbPb2018_kFirst=(TGraph*) (resfileCur->Get("kFirst_Pt1ResESA")->Clone("kFirst_Pt1ResECurSA"));
+        fPt1ResECurSA_PbPb2018_kOnlySecond=(TGraph*) (resfileCur->Get("kOnlySecond_Pt1ResESA")->Clone("kOnlySecond_Pt1ResECurSA"));
+      }
+      delete resfileCur;
+    }    
+  }
+    
+  //TString resfileUpgURI = Form("alien:///alice/cern.ch/user/p/pwg_hf/common/Improver/%s/%s/ITSgraphs_NewAll-X0.3-Res4um.root",period,systematic);
+
+
+  TString pathToFileUpgrade = AliDataFile::GetFileName(Form("PWGHF/common/Improver/%s/%s/ITSgraphs_NewAll-X0.3-Res4um.root",lProductionName.Data(),fImproverSuffix.Data()));  // find URI for improver file from CVMFS
+
+  TFile *resfileUpg=TFile::Open(pathToFileUpgrade.Data());
+  printf("\n### reading file %s ...\n",pathToFileUpgrade.Data());
+  if(resfileUpg)  printf("... READ ###\n");
+  if(resfileUpg) {
+    if(!fIsPbPb2018){ 
+      if(resfileUpg->Get("D0RPResP" )) {
+        fD0RPResPUpg =(TGraph*)(resfileUpg->Get("D0RPResP" )->Clone("D0RPResPUpg" ));
+      }
+      if(resfileUpg->Get("D0RPResK" )) {
+        fD0RPResKUpg =(TGraph*)(resfileUpg->Get("D0RPResK" )->Clone("D0RPResKUpg" ));
+      }
+      if(resfileUpg->Get("D0RPResPi")) {
+        fD0RPResPiUpg=(TGraph*)(resfileUpg->Get("D0RPResPi")->Clone("D0RPResPiUpg"));
+      }
+      if(resfileUpg->Get("D0RPResE")) {
+        fD0RPResEUpg=(TGraph*)(resfileUpg->Get("D0RPResE")->Clone("D0RPResEUpg"));
+      }
+      for(Int_t j=0; j<2; j++){
+        for(Int_t i=0; i<4; i++){
+	        if(resfileUpg->Get(Form("D0RPMeanP_B%d_phi%d",j,i))) {
+	          fD0RPMeanPUpg[j][i]=(TGraph*)(resfileUpg->Get(Form("D0RPMeanP_B%d_phi%d",j,i))->Clone(Form("D0RPMeanPUpg_B%d_phi%d",j,i)));
+	        }
+	        if(resfileUpg->Get(Form("D0RPMeanK_B%d_phi%d",j,i))) {
+	          fD0RPMeanKUpg[j][i]=(TGraph*)(resfileUpg->Get(Form("D0RPMeanK_B%d_phi%d",j,i))->Clone(Form("D0RPMeanKUpg_B%d_phi%d",j,i)));
+	        }
+	        if(resfileUpg->Get(Form("D0RPMeanPi_B%d_phi%d",j,i))) {
+	          fD0RPMeanPiUpg[j][i]=(TGraph*)(resfileUpg->Get(Form("D0RPMeanPi_B%d_phi%d",j,i))->Clone(Form("D0RPMeanPiUpg_B%d_phi%d",j,i)));
+	        }
+	        if(resfileUpg->Get(Form("D0RPMeanE_B%d_phi%d",j,i))) {
+	          fD0RPMeanEUpg[j][i]=(TGraph*)(resfileUpg->Get(Form("D0RPMeanE_B%d_phi%d",j,i))->Clone(Form("D0RPMeanEUpg_B%d_phi%d",j,i)));
+	        }
+        }
+      }
+      if(resfileUpg->Get("D0ZResP"  )) {
+        fD0ZResPUpg  =(TGraph*)(resfileUpg->Get("D0ZResP"  )->Clone("D0ZResPUpg"  ));
+      }
+      if(resfileUpg->Get("D0ZResK"  )) {
+        fD0ZResKUpg  =(TGraph*)(resfileUpg->Get("D0ZResK"  )->Clone("D0ZResKUpg"  ));
+      }
+      if(resfileUpg->Get("D0ZResPi" )) {
+        fD0ZResPiUpg =(TGraph*)(resfileUpg->Get("D0ZResPi" )->Clone("D0ZResPiUpg" ));
+      }
+      if(resfileUpg->Get("D0ZResE" )) {
+        fD0ZResEUpg =(TGraph*)(resfileUpg->Get("D0ZResE" )->Clone("D0ZResEUpg" ));
+      }
+      if(resfileUpg->Get("Pt1ResP"  )) {
+        fPt1ResPUpg  =(TGraph*)(resfileUpg->Get("Pt1ResP"  )->Clone("Pt1ResPUpg"  ));
+      }
+      if(resfileUpg->Get("Pt1ResK"  )) {
+        fPt1ResKUpg  =(TGraph*)(resfileUpg->Get("Pt1ResK"  )->Clone("Pt1ResKUpg"  ));
+      }
+      if(resfileUpg->Get("Pt1ResPi" )) {
+        fPt1ResPiUpg =(TGraph*)(resfileUpg->Get("Pt1ResPi" )->Clone("Pt1ResPiUpg" ));
+      }
+      if(resfileUpg->Get("Pt1ResE" )) {
+        fPt1ResEUpg =(TGraph*)(resfileUpg->Get("Pt1ResE" )->Clone("Pt1ResEUpg" ));
+      }
+      if(resfileUpg->Get("D0RPResPSA" )) {
+        fD0RPResPUpgSA =(TGraph*)(resfileUpg->Get("D0RPResPSA" )->Clone("D0RPResPUpgSA" ));
+      }
+      if(resfileUpg->Get("D0RPResKSA" )) {
+        fD0RPResKUpgSA =(TGraph*)(resfileUpg->Get("D0RPResKSA" )->Clone("D0RPResKUpgSA" ));
+      }
+      if(resfileUpg->Get("D0RPResPiSA")) {
+        fD0RPResPiUpgSA=(TGraph*)(resfileUpg->Get("D0RPResPiSA")->Clone("D0RPResPiUpgSA"));
+      }
+      if(resfileUpg->Get("D0RPResESA")) {
+        fD0RPResEUpgSA=(TGraph*)(resfileUpg->Get("D0RPResESA")->Clone("D0RPResEUpgSA"));
+      }
+      if(resfileUpg->Get("D0ZResPSA"  )) {
+        fD0ZResPUpgSA  =(TGraph*)(resfileUpg->Get("D0ZResPSA"  )->Clone("D0ZResPUpgSA"  ));
+      }
+      if(resfileUpg->Get("D0ZResKSA"  )) {
+        fD0ZResKUpgSA  =(TGraph*)(resfileUpg->Get("D0ZResKSA"  )->Clone("D0ZResKUpgSA"  ));
+      }
+      if(resfileUpg->Get("D0ZResPiSA" )) {
+        fD0ZResPiUpgSA =(TGraph*)(resfileUpg->Get("D0ZResPiSA" )->Clone("D0ZResPiUpgSA" ));
+      }
+      if(resfileUpg->Get("D0ZResESA" )) {
+        fD0ZResEUpgSA =(TGraph*)(resfileUpg->Get("D0ZResESA" )->Clone("D0ZResEUpgSA" ));
+      }
+      if(resfileUpg->Get("Pt1ResPSA"  )) {
+        fPt1ResPUpgSA  =(TGraph*)(resfileUpg->Get("Pt1ResPSA"  )->Clone("Pt1ResPUpgSA"  ));
+      }
+      if(resfileUpg->Get("Pt1ResKSA"  )) {
+        fPt1ResKUpgSA  =(TGraph*)(resfileUpg->Get("Pt1ResKSA"  )->Clone("Pt1ResKUpgSA"  ));
+      }
+      if(resfileUpg->Get("Pt1ResPiSA" )) {
+        fPt1ResPiUpgSA =(TGraph*)(resfileUpg->Get("Pt1ResPiSA" )->Clone("Pt1ResPiUpgSA" ));
+      }
+      if(resfileUpg->Get("Pt1ResESA" )) {
+        fPt1ResEUpgSA =(TGraph*)(resfileUpg->Get("Pt1ResESA" )->Clone("Pt1ResEUpgSA" ));
+      }
+      delete resfileUpg;
+    }
+    else  // analysing PbPb 2018 periods
+    {
+      if(resfileUpg->Get("kFirst_D0RPResP") && resfileUpg->Get("kOnlySecond_D0RPResP")){
+        fD0RPResPUpg_PbPb2018_kFirst=(TGraph*)(resfileUpg->Get("kFirst_D0RPResP")->Clone("kFirst_D0RPResPUpg"));
+        fD0RPResPUpg_PbPb2018_kOnlySecond=(TGraph*)(resfileUpg->Get("kOnlySecond_D0RPResP")->Clone("kOnlySecond_D0RPResPUpg"));
+      }
+      if(resfileUpg->Get("kFirst_D0RPResK") && resfileUpg->Get("kOnlySecond_D0RPResK")){
+        fD0RPResKUpg_PbPb2018_kFirst=(TGraph*)(resfileUpg->Get("kFirst_D0RPResK")->Clone("kFirst_D0RPResKUpg"));
+        fD0RPResKUpg_PbPb2018_kOnlySecond=(TGraph*)(resfileUpg->Get("kOnlySecond_D0RPResK")->Clone("kOnlySecond_D0RPResKUpg"));
+      }
+      if(resfileUpg->Get("kFirst_D0RPResPi") && resfileUpg->Get("kOnlySecond_D0RPResPi")){
+        fD0RPResPiUpg_PbPb2018_kFirst=(TGraph*)(resfileUpg->Get("kFirst_D0RPResPi")->Clone("kFirst_D0RPResPiUpg"));
+        fD0RPResPiUpg_PbPb2018_kOnlySecond=(TGraph*)(resfileUpg->Get("kOnlySecond_D0RPResPi")->Clone("kOnlySecond_D0RPResPiUpg"));
+      }
+      if(resfileUpg->Get("kFirst_D0RPResE") && resfileUpg->Get("kOnlySecond_D0RPResE")){
+        fD0RPResEUpg_PbPb2018_kFirst=(TGraph*)(resfileUpg->Get("kFirst_D0RPResE")->Clone("kFirst_D0RPResEUpg"));
+        fD0RPResEUpg_PbPb2018_kOnlySecond=(TGraph*)(resfileUpg->Get("kOnlySecond_D0RPResE")->Clone("kOnlySecond_D0RPResEUpg"));
+      }
+      for(UInt_t j = 0; j < 2; j++){
+        for(UInt_t i = 0; i < 24; i++){
+          if(resfileUpg->Get(Form("kFirst_D0RPMeanP_B%d_phi%d",j,i)) && resfileUpg->Get(Form("kOnlySecond_D0RPMeanP_B%d_phi%d",j,i))){
+            fD0RPMeanPUpg_PbPb2018_kFirst[j][i]=(TGraph*)(resfileUpg->Get(Form("kFirst_D0RPMeanP_B%d_phi%d",j,i))->Clone(Form("kFirst_D0RPMeanP_B%d_phi%d",j,i)));
+            fD0RPMeanPUpg_PbPb2018_kOnlySecond[j][i]=(TGraph*)(resfileUpg->Get(Form("kOnlySecond_D0RPMeanP_B%d_phi%d",j,i))->Clone(Form("kOnlySecond_D0RPMeanP_B%d_phi%d",j,i)));          
+          }
+          if(resfileUpg->Get(Form("kFirst_D0RPMeanK_B%d_phi%d",j,i)) && resfileUpg->Get(Form("kOnlySecond_D0RPMeanK_B%d_phi%d",j,i))){
+            fD0RPMeanKUpg_PbPb2018_kFirst[j][i]=(TGraph*)(resfileUpg->Get(Form("kFirst_D0RPMeanK_B%d_phi%d",j,i))->Clone(Form("kFirst_D0RPMeanK_B%d_phi%d",j,i)));
+            fD0RPMeanKUpg_PbPb2018_kOnlySecond[j][i]=(TGraph*)(resfileUpg->Get(Form("kOnlySecond_D0RPMeanK_B%d_phi%d",j,i))->Clone(Form("kOnlySecond_D0RPMeanK_B%d_phi%d",j,i)));          
+          }
+          if(resfileUpg->Get(Form("kFirst_D0RPMeanPi_B%d_phi%d",j,i)) && resfileUpg->Get(Form("kOnlySecond_D0RPMeanPi_B%d_phi%d",j,i))){
+            fD0RPMeanPiUpg_PbPb2018_kFirst[j][i]=(TGraph*)(resfileUpg->Get(Form("kFirst_D0RPMeanPi_B%d_phi%d",j,i))->Clone(Form("kFirst_D0RPMeanPi_B%d_phi%d",j,i)));
+            fD0RPMeanPiUpg_PbPb2018_kOnlySecond[j][i]=(TGraph*)(resfileUpg->Get(Form("kOnlySecond_D0RPMeanPi_B%d_phi%d",j,i))->Clone(Form("kOnlySecond_D0RPMeanPi_B%d_phi%d",j,i)));          
+          }
+          if(resfileUpg->Get(Form("kFirst_D0RPMeanE_B%d_phi%d",j,i)) && resfileUpg->Get(Form("kOnlySecond_D0RPMeanE_B%d_phi%d",j,i))){
+            fD0RPMeanEUpg_PbPb2018_kFirst[j][i]=(TGraph*)(resfileUpg->Get(Form("kFirst_D0RPMeanE_B%d_phi%d",j,i))->Clone(Form("kFirst_D0RPMeanE_B%d_phi%d",j,i)));
+            fD0RPMeanEUpg_PbPb2018_kOnlySecond[j][i]=(TGraph*)(resfileUpg->Get(Form("kOnlySecond_D0RPMeanE_B%d_phi%d",j,i))->Clone(Form("kOnlySecond_D0RPMeanE_B%d_phi%d",j,i)));          
+          }
+        } 
+      }
+      if(resfileUpg->Get("kFirst_D0ZResP") && resfileUpg->Get("kOnlySecond_D0ZResP")){
+        fD0ZResPUpg_PbPb2018_kFirst=(TGraph*)(resfileUpg->Get("kFirst_D0ZResP")->Clone("kFirst_D0ZResPUpg"));
+        fD0ZResPUpg_PbPb2018_kOnlySecond=(TGraph*)(resfileUpg->Get("kOnlySecond_D0ZResP")->Clone("kOnlySecond_D0ZResPUpg"));
+      }
+      if(resfileUpg->Get("kFirst_D0ZResK") && resfileUpg->Get("kOnlySecond_D0ZResK")){
+        fD0ZResKUpg_PbPb2018_kFirst=(TGraph*)(resfileUpg->Get("kFirst_D0ZResK")->Clone("kFirst_D0ZResKUpg"));
+        fD0ZResKUpg_PbPb2018_kOnlySecond=(TGraph*)(resfileUpg->Get("kOnlySecond_D0ZResK")->Clone("kOnlySecond_D0ZResKUpg"));
+      }
+      if(resfileUpg->Get("kFirst_D0ZResPi") && resfileUpg->Get("kOnlySecond_D0ZResPi")){
+        fD0ZResPiUpg_PbPb2018_kFirst=(TGraph*)(resfileUpg->Get("kFirst_D0ZResPi")->Clone("kFirst_D0ZResPiUpg"));
+        fD0ZResPiUpg_PbPb2018_kOnlySecond=(TGraph*)(resfileUpg->Get("kOnlySecond_D0ZResPi")->Clone("kOnlySecond_D0ZResPiUpg"));
+      }
+      if(resfileUpg->Get("kFirst_D0ZResE") && resfileUpg->Get("kOnlySecond_D0ZResE")){
+        fD0ZResEUpg_PbPb2018_kFirst=(TGraph*)(resfileUpg->Get("kFirst_D0ZResE")->Clone("kFirst_D0ZResEUpg"));
+        fD0ZResEUpg_PbPb2018_kOnlySecond=(TGraph*)(resfileUpg->Get("kOnlySecond_D0ZResE")->Clone("kOnlySecond_D0ZResEUpg"));
+      }
+      if(resfileUpg->Get("kFirst_Pt1ResP") && resfileUpg->Get("kOnlySecond_Pt1ResP")){
+        fPt1ResPUpg_PbPb2018_kFirst=(TGraph*) (resfileUpg->Get("kFirst_Pt1ResP")->Clone("kFirst_Pt1ResPUpg"));
+        fPt1ResPUpg_PbPb2018_kOnlySecond=(TGraph*) (resfileUpg->Get("kOnlySecond_Pt1ResP")->Clone("kOnlySecond_Pt1ResPUpg"));
+      }
+      if(resfileUpg->Get("kFirst_Pt1ResK") && resfileUpg->Get("kOnlySecond_Pt1ResK")){
+        fPt1ResKUpg_PbPb2018_kFirst=(TGraph*) (resfileUpg->Get("kFirst_Pt1ResK")->Clone("kFirst_Pt1ResKUpg"));
+        fPt1ResKUpg_PbPb2018_kOnlySecond=(TGraph*) (resfileUpg->Get("kOnlySecond_Pt1ResK")->Clone("kOnlySecond_Pt1ResKUpg"));
+      }
+      if(resfileUpg->Get("kFirst_Pt1ResPi") && resfileUpg->Get("kOnlySecond_Pt1ResPi")){
+        fPt1ResPiUpg_PbPb2018_kFirst=(TGraph*) (resfileUpg->Get("kFirst_Pt1ResPi")->Clone("kFirst_Pt1ResPiUpg"));
+        fPt1ResPiUpg_PbPb2018_kOnlySecond=(TGraph*) (resfileUpg->Get("kOnlySecond_Pt1ResPi")->Clone("kOnlySecond_Pt1ResPiUpg"));
+      }
+      if(resfileUpg->Get("kFirst_Pt1ResE") && resfileUpg->Get("kOnlySecond_Pt1ResE")){
+        fPt1ResEUpg_PbPb2018_kFirst=(TGraph*) (resfileUpg->Get("kFirst_Pt1ResE")->Clone("kFirst_Pt1ResEUpg"));
+        fPt1ResEUpg_PbPb2018_kOnlySecond=(TGraph*) (resfileUpg->Get("kOnlySecond_Pt1ResE")->Clone("kOnlySecond_Pt1ResEUpg"));
+      }
+      if(resfileUpg->Get("kFirst_D0RPResPSA") && resfileUpg->Get("kOnlySecond_D0RPResPSA")){
+        fD0RPResPUpgSA_PbPb2018_kFirst=(TGraph*) (resfileUpg->Get("kFirst_D0RPResPSA")->Clone("kFirst_D0RPResPUpgSA"));
+        fD0RPResPUpgSA_PbPb2018_kOnlySecond=(TGraph*) (resfileUpg->Get("kOnlySecond_D0RPResPSA")->Clone("kOnlySecond_D0RPResPUpgSA"));
+      }
+      if(resfileUpg->Get("kFirst_D0RPResKSA") && resfileUpg->Get("kOnlySecond_D0RPResKSA")){
+        fD0RPResKUpgSA_PbPb2018_kFirst=(TGraph*) (resfileUpg->Get("kFirst_D0RPResKSA")->Clone("kFirst_D0RPResKUpgSA"));
+        fD0RPResKUpgSA_PbPb2018_kOnlySecond=(TGraph*) (resfileUpg->Get("kOnlySecond_D0RPResKSA")->Clone("kOnlySecond_D0RPResKUpgSA"));
+      }
+      if(resfileUpg->Get("kFirst_D0RPResPiSA") && resfileUpg->Get("kOnlySecond_D0RPResPiSA")){
+        fD0RPResPiUpgSA_PbPb2018_kFirst=(TGraph*) (resfileUpg->Get("kFirst_D0RPResPiSA")->Clone("kFirst_D0RPResPiUpgSA"));
+        fD0RPResPiUpgSA_PbPb2018_kOnlySecond=(TGraph*) (resfileUpg->Get("kOnlySecond_D0RPResPiSA")->Clone("kOnlySecond_D0RPResPiUpgSA"));
+      }
+      if(resfileUpg->Get("kFirst_D0RPResESA") && resfileUpg->Get("kOnlySecond_D0RPResESA")){
+        fD0RPResEUpgSA_PbPb2018_kFirst=(TGraph*) (resfileUpg->Get("kFirst_D0RPResESA")->Clone("kFirst_D0RPResEUpgSA"));
+        fD0RPResEUpgSA_PbPb2018_kOnlySecond=(TGraph*) (resfileUpg->Get("kOnlySecond_D0RPResESA")->Clone("kOnlySecond_D0RPResEUpgSA"));
+      }
+      if(resfileUpg->Get("kFirst_D0ZResPSA") && resfileUpg->Get("kOnlyFirst_D0ZResPSA")){
+        fD0ZResPUpgSA_PbPb2018_kFirst=(TGraph*) (resfileUpg->Get("kFirst_D0ZResPSA")->Clone("kFirst_D0ZResPUpgSA"));
+        fD0ZResPUpgSA_PbPb2018_kOnlySecond=(TGraph*) (resfileUpg->Get("kOnlySecond_D0ZResPSA")->Clone("kOnlySecond_D0ZResPUpgSA"));
+      }
+      if(resfileUpg->Get("kFirst_D0ZResKSA") && resfileUpg->Get("kOnlyFirst_D0ZResKSA")){
+        fD0ZResKUpgSA_PbPb2018_kFirst=(TGraph*) (resfileUpg->Get("kFirst_D0ZResKSA")->Clone("kFirst_D0ZResKUpgSA"));
+        fD0ZResKUpgSA_PbPb2018_kOnlySecond=(TGraph*) (resfileUpg->Get("kOnlySecond_D0ZResKSA")->Clone("kOnlySecond_D0ZResKUpgSA"));
+      }
+      if(resfileUpg->Get("kFirst_D0ZResPiSA") && resfileUpg->Get("kOnlyFirst_D0ZResPiSA")){
+        fD0ZResPiUpgSA_PbPb2018_kFirst=(TGraph*) (resfileUpg->Get("kFirst_D0ZResPiSA")->Clone("kFirst_D0ZResPiUpgSA"));
+        fD0ZResPiUpgSA_PbPb2018_kOnlySecond=(TGraph*) (resfileUpg->Get("kOnlySecond_D0ZResPiSA")->Clone("kOnlySecond_D0ZResPiUpgSA"));
+      }
+      if(resfileUpg->Get("kFirst_D0ZResESA") && resfileUpg->Get("kOnlyFirst_D0ZResESA")){
+        fD0ZResEUpgSA_PbPb2018_kFirst=(TGraph*) (resfileUpg->Get("kFirst_D0ZResESA")->Clone("kFirst_D0ZResEUpgSA"));
+        fD0ZResEUpgSA_PbPb2018_kOnlySecond=(TGraph*) (resfileUpg->Get("kOnlySecond_D0ZResESA")->Clone("kOnlySecond_D0ZResEUpgSA"));
+      }
+      if(resfileUpg->Get("kFirst_Pt1ResPSA") && resfileUpg->Get("kOnlySecond_Pt1ResPSA")){
+        fPt1ResPUpgSA_PbPb2018_kFirst=(TGraph*) (resfileUpg->Get("kFirst_Pt1ResPSA")->Clone("kFirst_Pt1ResPUpgSA"));
+        fPt1ResPUpgSA_PbPb2018_kOnlySecond=(TGraph*) (resfileUpg->Get("kOnlySecond_Pt1ResPSA")->Clone("kOnlySecond_Pt1ResPUpgSA"));
+      }
+      if(resfileUpg->Get("kFirst_Pt1ResKSA") && resfileUpg->Get("kOnlySecond_Pt1ResKSA")){
+        fPt1ResKUpgSA_PbPb2018_kFirst=(TGraph*) (resfileUpg->Get("kFirst_Pt1ResKSA")->Clone("kFirst_Pt1ResKUpgSA"));
+        fPt1ResKUpgSA_PbPb2018_kOnlySecond=(TGraph*) (resfileUpg->Get("kOnlySecond_Pt1ResKSA")->Clone("kOnlySecond_Pt1ResKUpgSA"));
+      }
+      if(resfileUpg->Get("kFirst_Pt1ResPiSA") && resfileUpg->Get("kOnlySecond_Pt1ResPiSA")){
+        fPt1ResPiUpgSA_PbPb2018_kFirst=(TGraph*) (resfileUpg->Get("kFirst_Pt1ResPiSA")->Clone("kFirst_Pt1ResPiUpgSA"));
+        fPt1ResPiUpgSA_PbPb2018_kOnlySecond=(TGraph*) (resfileUpg->Get("kOnlySecond_Pt1ResPiSA")->Clone("kOnlySecond_Pt1ResPiUpgSA"));
+      }
+      if(resfileUpg->Get("kFirst_Pt1ResESA") && resfileUpg->Get("kOnlySecond_Pt1ResESA")){
+        fPt1ResEUpgSA_PbPb2018_kFirst=(TGraph*) (resfileUpg->Get("kFirst_Pt1ResESA")->Clone("kFirst_Pt1ResEUpgSA"));
+        fPt1ResEUpgSA_PbPb2018_kOnlySecond=(TGraph*) (resfileUpg->Get("kOnlySecond_Pt1ResESA")->Clone("kOnlySecond_Pt1ResEUpgSA"));
+      }
+      delete resfileUpg;
+    }
+  
+  }
+
+   fFilesOpen = kTRUE;
 }
 
 ClassImp(AliAnalysisTaskSEImproveITS);
