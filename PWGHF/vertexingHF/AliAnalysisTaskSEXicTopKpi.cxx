@@ -204,6 +204,9 @@ AliAnalysisTaskSEXicTopKpi::AliAnalysisTaskSEXicTopKpi():
   ,fCandCounter_onTheFly(0x0)
   ,fNSigmaPreFilterPID(3.)
   ,fApplyEvSel(kTRUE)
+  ,fNoStdPIDcases(kFALSE)
+  ,fPtSoftPionCand(0)
+  ,fPtSoftPionCand_insideScLoop(0)
 {
   /// Default constructor
 
@@ -326,6 +329,9 @@ AliAnalysisTaskSEXicTopKpi::AliAnalysisTaskSEXicTopKpi(const char *name,AliRDHFC
   ,fCandCounter_onTheFly(0x0)
   ,fNSigmaPreFilterPID(3.)
   ,fApplyEvSel(kTRUE)
+  ,fNoStdPIDcases(kFALSE)
+  ,fPtSoftPionCand(0)
+  ,fPtSoftPionCand_insideScLoop(0)
 {
   /// Default constructor
 
@@ -727,6 +733,7 @@ void AliAnalysisTaskSEXicTopKpi::UserCreateOutputObjects()
     printf("\n#################################################################################\n");
     printf("ATTENTION: bins for PID axis in reco THnSparse for Lc (Xic) increased from 11 to 12\n");
     printf("#################################################################################\n");
+    nbinsSparse[7]=12;
     upEdges[7]=11.5;
   }
   if(fIsXicUpgradeAnalysis){
@@ -750,8 +757,9 @@ void AliAnalysisTaskSEXicTopKpi::UserCreateOutputObjects()
   }
   if(fExplore_PIDstdCuts && fExplPID_BayesOnlyProt){  // add the bin for the Bayes PID case only for proton hypothesis
     printf("\n#################################################################################\n");
-    printf("ATTENTION: bins for PID axis in reco THnSparse for Lc (Xic) increased from 11 to 12\n");
+    printf("ATTENTION: bins for PID axis in reco THnSparse for SigmaC increased from 11 to 12\n");
     printf("#################################################################################\n");
+    nbinsSparseSigma[7]=12;
     upEdgesSigma[7]=11.5;
   }
   if(fReadMC){
@@ -856,6 +864,11 @@ void AliAnalysisTaskSEXicTopKpi::UserCreateOutputObjects()
   //
 
 
+  // pT distribution of soft pion candidate tracks
+  fPtSoftPionCand = new TH1F("fPtSoftPionCand","soft pion candidates;#it{p}_{T} (GeV/#it{c});",1000,0,0.2);
+  // pT distribution of soft pion candidate tracks before SigmaC loop
+  fPtSoftPionCand_insideScLoop = new TH1F("fPtSoftPionCand_insideScLoop","soft pion candidates inside SigmaC loop;#it{p}_{T} (GeV/#it{c});",1000,0,0.2);
+
   fOutput->Add(fDist12Signal);
   fOutput->Add(fDist12SignalFilter);
   fOutput->Add(fDist12All);
@@ -900,6 +913,8 @@ void AliAnalysisTaskSEXicTopKpi::UserCreateOutputObjects()
   fOutput->Add(fKaonID);
   fOutput->Add(fPionID);
   if(fStudyScPeakMC)  fOutput->Add(fhsparseMC_ScPeak);
+  fOutput->Add(fPtSoftPionCand);
+  fOutput->Add(fPtSoftPionCand_insideScLoop);
 
 
   // Post the data
@@ -1713,9 +1728,17 @@ void AliAnalysisTaskSEXicTopKpi::UserExec(Option_t */*option*/)
 		      if(arrayPIDpkpi[i]){
 			if(fReadMC && (converted_isTrueLcXic==2 || converted_isTrueLcXic==6 || converted_isTrueLcXic==8 || converted_isTrueLcXic==11 || converted_isTrueLcXic==15 || converted_isTrueLcXic==17)) {
 			  point[0]=part->Pt();
-			  fhSparseAnalysis->Fill(point);
+        if(fNoStdPIDcases){
+          if(i==0 || i==11) fhSparseAnalysis->Fill(point);  // avoid to fill the cases with STD PID
+        }
+        else  fhSparseAnalysis->Fill(point);
 			}
-			if(!fReadMC || (fReadMC&&fIsXicUpgradeAnalysis&&fIsKeepOnlyBkgXicUpgradeAnalysis) )  fhSparseAnalysis->Fill(point);
+			if(!fReadMC || (fReadMC&&fIsXicUpgradeAnalysis&&fIsKeepOnlyBkgXicUpgradeAnalysis) ){
+        if(fNoStdPIDcases){
+          if(i==0 || i==11) fhSparseAnalysis->Fill(point);  // avoid to fill the cases with STD PID
+        }
+        else  fhSparseAnalysis->Fill(point);
+      }
 		      }
 	      }
 	    }	    	   
@@ -1742,9 +1765,17 @@ void AliAnalysisTaskSEXicTopKpi::UserExec(Option_t */*option*/)
 		if(arrayPIDpikp[i]){
 		  if(fReadMC && (converted_isTrueLcXic==3 || converted_isTrueLcXic==7 || converted_isTrueLcXic==9 || converted_isTrueLcXic==12 || converted_isTrueLcXic==16 || converted_isTrueLcXic==18))  {
 		    point[0]=part->Pt();
-		    fhSparseAnalysis->Fill(point);
+		    if(fNoStdPIDcases){
+          if(i==0 || i==11) fhSparseAnalysis->Fill(point);  // avoid to fill the cases with STD PID
+        }
+        else  fhSparseAnalysis->Fill(point);
 		  }
-		  if(!fReadMC || (fReadMC&&fIsXicUpgradeAnalysis&&fIsKeepOnlyBkgXicUpgradeAnalysis) )  fhSparseAnalysis->Fill(point);
+		  if(!fReadMC || (fReadMC&&fIsXicUpgradeAnalysis&&fIsKeepOnlyBkgXicUpgradeAnalysis) ){
+        if(fNoStdPIDcases){
+          if(i==0 || i==11) fhSparseAnalysis->Fill(point);  // avoid to fill the cases with STD PID
+        }
+        else  fhSparseAnalysis->Fill(point);
+      }
 		}
 	      }
 	    }	  
@@ -1859,6 +1890,8 @@ void AliAnalysisTaskSEXicTopKpi::SigmaCloop(AliAODRecoDecayHF3Prong *io3Prong,Al
     if(pSigmaC){
       if(TMath::Abs(tracksoft->GetLabel())!=labelSoftPi)continue;
     }
+
+    fPtSoftPionCand_insideScLoop->Fill(tracksoft->Pt());
     
     if(itrack1==-1){// Lc from filtered candidate --> need to check ID
       Bool_t skip=kFALSE;
@@ -3061,6 +3094,7 @@ void AliAnalysisTaskSEXicTopKpi::PrepareTracks(AliAODEvent *aod,TClonesArray *mc
     
     if(iSelSoftPionCuts>=0){
       ftrackArraySelSoftPi->AddAt(itrack,fnSelSoftPi);
+      fPtSoftPionCand->Fill(trackESD->Pt());
       fnSelSoftPi++;
     }    
     

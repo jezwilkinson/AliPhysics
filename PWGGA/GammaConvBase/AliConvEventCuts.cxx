@@ -184,6 +184,7 @@ AliConvEventCuts::AliConvEventCuts(const char *name,const char *title) :
   hV0MultVsNumberTPCoutTracks(NULL),
   hTPCSDDSSDClusters(NULL),
   fV0ReaderName(""),
+  CaloTriggerHelperName(""),
   fCorrTaskSetting(""),
   fCaloTriggers(NULL),
   fTriggerPatchInfo(NULL),
@@ -325,6 +326,7 @@ AliConvEventCuts::AliConvEventCuts(const AliConvEventCuts &ref) :
   hV0MultVsNumberTPCoutTracks(NULL),
   hTPCSDDSSDClusters(NULL),
   fV0ReaderName(ref.fV0ReaderName),
+  CaloTriggerHelperName(ref.CaloTriggerHelperName),
   fCorrTaskSetting(ref.fCorrTaskSetting),
   fCaloTriggers(NULL),
   fTriggerPatchInfo(NULL),
@@ -487,12 +489,12 @@ void AliConvEventCuts::InitCutHistograms(TString name, Bool_t preCut){
     }
     hCentrality=new TH1F(Form("Centrality %s",GetCutNumber().Data()),"Centrality",centBins,arrCent);
   } else if( fModCentralityClass == 21){// high mult 0.01%
-    const Int_t centBins = 245;
+    const Int_t centBins = 235;
     Double_t arrCent[centBins + 1];
     for(Int_t i = 0; i < centBins + 1; i++){
       if(i < 100) arrCent[i] = i*0.01;
-      else if(i < 150) arrCent[i] = 1 + 0.1*(i-100);
-      else if( i < centBins) arrCent[i] = 5 + (i-150);
+      else if(i < 140) arrCent[i] = 1 + 0.1*(i-100);
+      else if( i < centBins) arrCent[i] = 5 + (i-140);
       else arrCent[i] = 100;
     }
     hCentrality=new TH1F(Form("Centrality %s",GetCutNumber().Data()),"Centrality",centBins,arrCent);
@@ -5287,11 +5289,11 @@ Bool_t AliConvEventCuts::MimicTrigger(AliVEvent *event, Bool_t isMC ){
   if ((fMimicTrigger == 3)||(fMimicTrigger == 4)){
     if (fSpecialTrigger == 6){
       AliCaloTriggerMimicHelper* tempMimickHelper = 0x0;
-      tempMimickHelper = (AliCaloTriggerMimicHelper*) (AliAnalysisManager::GetAnalysisManager()->GetTask(Form("CaloTriggerHelper_%s", GetCutNumber().Data()) ));
+      tempMimickHelper = (AliCaloTriggerMimicHelper*) (AliAnalysisManager::GetAnalysisManager()->GetTask(CaloTriggerHelperName.Data()));
       if (tempMimickHelper){
         return tempMimickHelper->GetEventChosenByTrigger();
       } else {
-        AliFatal(Form("AliCaloTriggerMimicHelper tempMimickHelper was not found for fSpecialTrigger == %d and fMimicTrigger == %d", fSpecialTrigger, fMimicTrigger));
+        AliFatal(Form("AliCaloTriggerMimicHelper tempMimickHelper was not found for fSpecialTrigger == %d and fMimicTrigger == %d (name:%s)", fSpecialTrigger, fMimicTrigger,CaloTriggerHelperName.Data()));
       }
     } else {
         AliFatal(Form("fSpecialTrigger == %d was not implemented in MimicTrigger case fMimicTrigger == %d", fSpecialTrigger, fMimicTrigger));
