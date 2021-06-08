@@ -1359,8 +1359,9 @@ int AliAnalysisTaskSECharmHadronvn::IsCandidateSelected(AliAODRecoDecayHF *&d, i
             arrDauTracks.AddAt(track,iDau);
         }
     } else if (fDecChannel == kLctopK0S) {
-         for(int iDau=0; iDau<nDau-1; iDau++) {  //nDau==3 for daughter subtraction; RDHFcuts preselect for Lc2V0 stops at V0 level
-               track = vHF->GetProng(fAOD,d,iDau);  
+         for(int iDau=0; iDau<2; iDau++) {  //nDau==3 for daughter subtraction; RDHFcuts preselect for Lc2V0 stops at V0 level
+               if (iDau == 0) track = vHF->GetProng(fAOD,d,iDau);  
+               else track = (AliAODTrack*)(fAOD->GetV0(d->GetProngID(1)));
                arrDauTracks.AddAt(track,iDau);
          }
     } else {
